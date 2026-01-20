@@ -1,0 +1,82 @@
+# =========================
+# .NET / Visual Studio
+# =========================
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+*.nuget.props
+*.nuget.targets
+
+# Visual Studio
+.vscode/
+*.sln.iml
+.idea/
+
+# =========================
+# Firebase & Secrets
+# =========================
+firebase-credentials.json
+**/firebase-credentials.json
+**/firebase*.json
+
+# Ignore ALL appsettings files to protect secrets
+appsettings.json
+appsettings.*.json
+**/appsettings.json
+**/appsettings.*.json
+
+# User secrets
+secrets.json
+**/secrets/
+
+# Environment files
+.env
+.env.*
+*.env
+
+# =========================
+# ASP.NET Core
+# =========================
+appsettings.local.json
+appsettings.*.local.json
+
+# =========================
+# Logs
+# =========================
+logs/
+*.log
+Logs/
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+# Misc
+# =========================
+*.tmp
+*.temp
+*.bak
+*.swp
+*~

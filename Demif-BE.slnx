@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Demif.Api/Demif.Api.csproj" />
+    <Project Path="src/Demif.Application/Demif.Application.csproj" />
+    <Project Path="src/Demif.Domain/Demif.Domain.csproj" />
+    <Project Path="src/Demif.Infrastructure/Demif.Infrastructure.csproj" />
+  </Folder>
+</Solution>
