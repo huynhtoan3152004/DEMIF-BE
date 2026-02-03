@@ -33,14 +33,14 @@ public class UpdateUserStatusService
         // 1. Validate status
         if (!Enum.TryParse<UserStatus>(request.Status, true, out var newStatus))
         {
-            return Result.Failure(Error.Validation("Invalid status value. Valid values: Active, Inactive, Suspended, Banned"));
+            return Result.Failure(Error.Validation("Giá trị trạng thái không hợp lệ. Giá trị hợp lệ: Active, Inactive, Suspended, Banned"));
         }
 
         // 2. Lấy user
         var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
         if (user is null)
         {
-            return Result.Failure(Error.NotFound("User not found."));
+            return Result.Failure(Error.NotFound("Không tìm thấy người dùng."));
         }
 
         // 3. Cập nhật status

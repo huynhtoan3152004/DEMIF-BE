@@ -43,7 +43,7 @@ public class RefreshTokenService
 
         if (existingToken is null)
         {
-            return Result.Failure<RefreshTokenResponse>(Error.Unauthorized("Invalid refresh token."));
+            return Result.Failure<RefreshTokenResponse>(Error.Unauthorized("Refresh token không hợp lệ."));
         }
 
         // 2. Kiểm tra token còn hiệu lực không
@@ -61,13 +61,13 @@ public class RefreshTokenService
                 await _dbContext.SaveChangesAsync(cancellationToken);
             }
 
-            return Result.Failure<RefreshTokenResponse>(Error.Unauthorized("Token is no longer valid."));
+            return Result.Failure<RefreshTokenResponse>(Error.Unauthorized("Token đã hết hạn hoặc bị vô hiệu."));
         }
 
         var user = existingToken.User;
         if (user is null)
         {
-            return Result.Failure<RefreshTokenResponse>(Error.NotFound("User not found."));
+            return Result.Failure<RefreshTokenResponse>(Error.NotFound("Không tìm thấy người dùng."));
         }
 
         // 3. Revoke token cũ (token rotation)

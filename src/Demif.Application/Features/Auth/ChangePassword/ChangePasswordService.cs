@@ -37,19 +37,19 @@ public class ChangePasswordService
         var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
         if (user is null)
         {
-            return Result.Failure(Error.NotFound("User not found."));
+            return Result.Failure(Error.NotFound("Không tìm thấy người dùng."));
         }
 
         // 2. Verify mật khẩu hiện tại
         if (user.PasswordHash is null || !_passwordHasher.Verify(request.CurrentPassword, user.PasswordHash))
         {
-            return Result.Failure(Error.Unauthorized("Current password is incorrect."));
+            return Result.Failure(Error.Unauthorized("Mật khẩu hiện tại không đúng."));
         }
 
         // 3. Kiểm tra mật khẩu mới không trùng mật khẩu cũ
         if (_passwordHasher.Verify(request.NewPassword, user.PasswordHash))
         {
-            return Result.Failure(Error.Validation("New password must be different from current password."));
+            return Result.Failure(Error.Validation("Mật khẩu mới phải khác mật khẩu hiện tại."));
         }
 
         // 4. Hash mật khẩu mới và cập nhật

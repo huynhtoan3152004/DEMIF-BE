@@ -1,3 +1,4 @@
+using Demif.Api.Configurations;
 using Demif.Application;
 using Demif.Infrastructure;
 using Serilog;
@@ -16,7 +17,9 @@ builder.Host.UseSerilog();
 // Add services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+// Swagger với JWT Bearer Authorization và XML Documentation
+builder.Services.AddSwaggerConfiguration();
 
 // Add Application & Infrastructure (Clean Architecture DI)
 builder.Services.AddApplication();
@@ -27,8 +30,7 @@ var app = builder.Build();
 // Configure pipeline
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerConfiguration();
 }
 
 app.UseHttpsRedirection();

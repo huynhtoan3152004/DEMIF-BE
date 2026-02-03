@@ -23,7 +23,7 @@ public class GetMyProfileService
 
         if (user is null)
         {
-            return Result.Failure<GetMyProfileResponse>(Error.NotFound("User not found."));
+            return Result.Failure<GetMyProfileResponse>(Error.NotFound("Không tìm thấy người dùng."));
         }
 
         return new GetMyProfileResponse

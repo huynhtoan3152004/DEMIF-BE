@@ -30,7 +30,7 @@ public class UpdateMyProfileService
 
         if (user is null)
         {
-            return Result.Failure(Error.NotFound("User not found."));
+            return Result.Failure(Error.NotFound("Không tìm thấy người dùng."));
         }
 
         // Kiểm tra username nếu có cập nhật
@@ -39,7 +39,7 @@ public class UpdateMyProfileService
         {
             if (await _userRepository.ExistsUsernameAsync(request.Username, cancellationToken))
             {
-                return Result.Failure(Error.Conflict("Username already exists."));
+                return Result.Failure(Error.Conflict("Tên người dùng đã tồn tại."));
             }
             user.Username = request.Username.Trim();
         }

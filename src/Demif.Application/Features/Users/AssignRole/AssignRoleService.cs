@@ -34,14 +34,14 @@ public class AssignRoleService
         var user = await _userRepository.GetByIdWithRolesAsync(userId, cancellationToken);
         if (user is null)
         {
-            return Result.Failure(Error.NotFound("User not found."));
+            return Result.Failure(Error.NotFound("Không tìm thấy người dùng."));
         }
 
         // 2. Kiểm tra role tồn tại
         var role = await _roleRepository.GetByNameAsync(request.RoleName, cancellationToken);
         if (role is null)
         {
-            return Result.Failure(Error.NotFound($"Role '{request.RoleName}' not found."));
+            return Result.Failure(Error.NotFound($"Không tìm thấy vai trò '{request.RoleName}'."));
         }
 
         // 3. Kiểm tra user đã có role này chưa (không tính role đã hết hạn)
@@ -51,7 +51,7 @@ public class AssignRoleService
 
         if (existingRole is not null)
         {
-            return Result.Failure(Error.Conflict($"User already has role '{request.RoleName}'."));
+            return Result.Failure(Error.Conflict($"Người dùng đã có vai trò '{request.RoleName}'."));
         }
 
         // 4. Gán role

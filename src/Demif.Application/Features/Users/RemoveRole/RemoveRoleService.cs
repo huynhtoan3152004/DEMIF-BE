@@ -32,21 +32,21 @@ public class RemoveRoleService
         var user = await _userRepository.GetByIdWithRolesAsync(userId, cancellationToken);
         if (user is null)
         {
-            return Result.Failure(Error.NotFound("User not found."));
+            return Result.Failure(Error.NotFound("Không tìm thấy người dùng."));
         }
 
         // 2. Kiểm tra role tồn tại
         var role = await _roleRepository.GetByNameAsync(roleName, cancellationToken);
         if (role is null)
         {
-            return Result.Failure(Error.NotFound($"Role '{roleName}' not found."));
+            return Result.Failure(Error.NotFound($"Không tìm thấy vai trò '{roleName}'."));
         }
 
         // 3. Tìm user role
         var userRole = user.UserRoles.FirstOrDefault(ur => ur.RoleId == role.Id);
         if (userRole is null)
         {
-            return Result.Failure(Error.NotFound($"User does not have role '{roleName}'."));
+            return Result.Failure(Error.NotFound($"Người dùng không có vai trò '{roleName}'."));
         }
 
         // 4. Không cho phép xóa role cuối cùng
@@ -55,7 +55,7 @@ public class RemoveRoleService
         
         if (activeRolesCount <= 1)
         {
-            return Result.Failure(Error.Validation("Cannot remove the last role from user."));
+            return Result.Failure(Error.Validation("Không thể xóa vai trò cuối cùng của người dùng."));
         }
 
         // 5. Xóa role

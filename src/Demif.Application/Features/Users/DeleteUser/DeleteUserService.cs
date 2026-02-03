@@ -33,7 +33,7 @@ public class DeleteUserService
 
         if (user is null)
         {
-            return Result.Failure(Error.NotFound("User not found."));
+            return Result.Failure(Error.NotFound("Không tìm thấy người dùng."));
         }
 
         // Soft delete: set status to Inactive

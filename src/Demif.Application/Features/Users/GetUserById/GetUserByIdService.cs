@@ -23,7 +23,7 @@ public class GetUserByIdService
 
         if (user is null)
         {
-            return Result.Failure<GetUserByIdResponse>(Error.NotFound("User not found."));
+            return Result.Failure<GetUserByIdResponse>(Error.NotFound("Không tìm thấy người dùng."));
         }
 
         var response = new GetUserByIdResponse

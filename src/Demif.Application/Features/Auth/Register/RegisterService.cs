@@ -47,13 +47,13 @@ public class RegisterService
         // 1. Kiểm tra email đã tồn tại chưa
         if (await _userRepository.ExistsEmailAsync(request.Email, cancellationToken))
         {
-            return Result.Failure<RegisterResponse>(Error.Conflict("Email already exists."));
+            return Result.Failure<RegisterResponse>(Error.Conflict("Email đã tồn tại."));
         }
 
         // 2. Kiểm tra username đã tồn tại chưa
         if (await _userRepository.ExistsUsernameAsync(request.Username, cancellationToken))
         {
-            return Result.Failure<RegisterResponse>(Error.Conflict("Username already exists."));
+            return Result.Failure<RegisterResponse>(Error.Conflict("Tên người dùng đã tồn tại."));
         }
 
         // 3. Lấy role mặc định (User)
@@ -64,7 +64,7 @@ public class RegisterService
             defaultRole = await _roleRepository.GetByNameAsync("User", cancellationToken);
             if (defaultRole is null)
             {
-                return Result.Failure<RegisterResponse>(Error.Internal("Default role not configured."));
+                return Result.Failure<RegisterResponse>(Error.Internal("Chưa cấu hình vai trò mặc định."));
             }
         }
 

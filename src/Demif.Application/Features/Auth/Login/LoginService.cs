@@ -48,19 +48,19 @@ public class LoginService
         var user = await _userRepository.GetByEmailWithRolesAsync(request.Email, cancellationToken);
         if (user is null)
         {
-            return Result.Failure<LoginResponse>(Error.Unauthorized("Invalid email or password."));
+            return Result.Failure<LoginResponse>(Error.Unauthorized("Email hoặc mật khẩu không đúng."));
         }
 
         // 2. Kiểm tra user status
         if (user.Status != UserStatus.Active)
         {
-            return Result.Failure<LoginResponse>(Error.Unauthorized("Your account is not active."));
+            return Result.Failure<LoginResponse>(Error.Unauthorized("Tài khoản của bạn chưa được kích hoạt."));
         }
 
         // 3. Verify password
         if (user.PasswordHash is null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
         {
-            return Result.Failure<LoginResponse>(Error.Unauthorized("Invalid email or password."));
+            return Result.Failure<LoginResponse>(Error.Unauthorized("Email hoặc mật khẩu không đúng."));
         }
 
         // 4. Lấy danh sách roles

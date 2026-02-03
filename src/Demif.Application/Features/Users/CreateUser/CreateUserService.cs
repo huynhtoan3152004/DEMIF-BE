@@ -37,13 +37,13 @@ public class CreateUserService
         // 1. Kiểm tra email đã tồn tại
         if (await _userRepository.ExistsEmailAsync(request.Email, cancellationToken))
         {
-            return Result.Failure<Guid>(Error.Conflict("Email already exists."));
+            return Result.Failure<Guid>(Error.Conflict("Email đã tồn tại."));
         }
 
         // 2. Kiểm tra username đã tồn tại
         if (await _userRepository.ExistsUsernameAsync(request.Username, cancellationToken))
         {
-            return Result.Failure<Guid>(Error.Conflict("Username already exists."));
+            return Result.Failure<Guid>(Error.Conflict("Tên người dùng đã tồn tại."));
         }
 
         // 3. Tạo user mới
