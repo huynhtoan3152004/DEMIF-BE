@@ -1,0 +1,15 @@
+{
+  "workspace": {
+    "id": "15e89c38-677e-4afd-b474-b3511665cf0f"
+  },
+  "entities": {
+    "environments": [],
+    "flows": [],
+    "globals": [],
+    "mocks": [],
+    "specs": [
+      "..\\src\\Demif.Api\\obj\\Debug\\net8.0\\EndpointInfo\\Demif.Api.json"
+    ],
+    "collections": []
+  }
+}

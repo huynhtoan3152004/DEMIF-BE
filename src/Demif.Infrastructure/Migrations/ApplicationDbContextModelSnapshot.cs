@@ -96,6 +96,50 @@ namespace Demif.Infrastructure.Migrations
                     b.ToTable("Lessons", (string)null);
                 });
 
+            modelBuilder.Entity("Demif.Domain.Entities.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedByIp")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReplacedByToken")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RevokeReason")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RevokedByIp")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RefreshTokens");
+                });
+
             modelBuilder.Entity("Demif.Domain.Entities.Role", b =>
                 {
                     b.Property<Guid>("Id")
@@ -446,6 +490,17 @@ namespace Demif.Infrastructure.Migrations
                     b.ToTable("UserStreaks");
                 });
 
+            modelBuilder.Entity("Demif.Domain.Entities.RefreshToken", b =>
+                {
+                    b.HasOne("Demif.Domain.Entities.User", "User")
+                        .WithMany("RefreshTokens")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Demif.Domain.Entities.UserExercise", b =>
                 {
                     b.HasOne("Demif.Domain.Entities.Lesson", "Lesson")
@@ -521,6 +576,8 @@ namespace Demif.Infrastructure.Migrations
                     b.Navigation("Exercises");
 
                     b.Navigation("Progress");
+
+                    b.Navigation("RefreshTokens");
 
                     b.Navigation("Streak");
 

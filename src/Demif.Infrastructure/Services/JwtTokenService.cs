@@ -9,7 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 namespace Demif.Infrastructure.Services;
 
 /// <summary>
-/// JWT Token Service implementation
+/// JWT Token Service implementation - hỗ trợ multiple roles
 /// </summary>
 public class JwtTokenService : IJwtTokenService
 {
@@ -20,7 +20,7 @@ public class JwtTokenService : IJwtTokenService
         _configuration = configuration;
     }
 
-    public string GenerateAccessToken(Guid userId, string email, string role = "User")
+    public string GenerateAccessToken(Guid userId, string email, IEnumerable<string> roles)
     {
         var key = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
         var issuer = _configuration["Jwt:Issuer"];
@@ -30,13 +30,18 @@ public class JwtTokenService : IJwtTokenService
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, email),
-            new Claim(ClaimTypes.Role, role),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
+
+        // Add multiple role claims
+        foreach (var role in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
 
         var token = new JwtSecurityToken(
             issuer: issuer,
@@ -57,7 +62,7 @@ public class JwtTokenService : IJwtTokenService
         return Convert.ToBase64String(randomBytes);
     }
 
-    public (bool isValid, Guid userId) ValidateAccessToken(string token)
+    public (bool isValid, Guid userId, IEnumerable<string> roles) ValidateAccessToken(string token)
     {
         try
         {
@@ -76,17 +81,19 @@ public class JwtTokenService : IJwtTokenService
 
             var principal = tokenHandler.ValidateToken(token, validationParameters, out _);
             var userIdClaim = principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+            var roles = principal.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
 
             if (Guid.TryParse(userIdClaim, out var userId))
             {
-                return (true, userId);
+                return (true, userId, roles);
             }
 
-            return (false, Guid.Empty);
+            return (false, Guid.Empty, Enumerable.Empty<string>());
         }
         catch
         {
-            return (false, Guid.Empty);
+            return (false, Guid.Empty, Enumerable.Empty<string>());
         }
     }
 }
+

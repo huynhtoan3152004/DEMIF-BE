@@ -6,6 +6,8 @@ namespace Demif.Domain.Enums;
 public enum UserStatus
 {
     Active = 1,
-    Suspended = 2,
-    Banned = 3
+    Inactive = 2,
+    Suspended = 3,
+    Banned = 4
 }
+

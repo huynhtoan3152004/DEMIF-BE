@@ -35,4 +35,5 @@ public class User : AuditableEntity
     public virtual UserStreak? Streak { get; set; }
     public virtual ICollection<UserExercise> Exercises { get; set; } = new List<UserExercise>();
     public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
+    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 }

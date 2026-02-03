@@ -32,6 +32,8 @@ public static class DependencyInjection
         services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ILessonRepository, LessonRepository>();
+        services.AddScoped<IRoleRepository, RoleRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 
         // Services
         services.AddScoped<IJwtTokenService, JwtTokenService>();
@@ -60,6 +62,14 @@ public static class DependencyInjection
                 };
             });
 
+        // Authorization Policies
+        services.AddAuthorizationBuilder()
+            .AddPolicy("RequireAdmin", policy => policy.RequireRole("Admin"))
+            .AddPolicy("RequireStaff", policy => policy.RequireRole("Admin", "Staff"))
+            .AddPolicy("RequireUser", policy => policy.RequireRole("Admin", "Staff", "User", "Premium"))
+            .AddPolicy("RequirePremium", policy => policy.RequireRole("Admin", "Premium"));
+
         return services;
     }
 }
+

@@ -120,9 +120,14 @@ public class FirebaseLoginService
                 .Select(ur => ur.Role.Name)
                 .ToList();
 
+            // Fallback nếu user không có role
+            if (!roles.Any())
+            {
+                roles.Add("User");
+            }
+
             // 5. Generate JWT token
-            var primaryRole = roles.FirstOrDefault() ?? "User";
-            var accessToken = _jwtTokenService.GenerateAccessToken(user.Id, user.Email, primaryRole);
+            var accessToken = _jwtTokenService.GenerateAccessToken(user.Id, user.Email, roles);
 
             return Result.Success<FirebaseLoginResponse>(new FirebaseLoginResponse(
                 UserId: user.Id,
