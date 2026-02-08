@@ -2,6 +2,37 @@
 # Docker Compose for Demif-BE
 # Use this for local development or Coolify Docker Compose deployment
 # ==============================================
+#
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  📋 COOLIFY ENVIRONMENT VARIABLES - Copy vào "Environment Variables" tab     ║
+# ╠══════════════════════════════════════════════════════════════════════════════╣
+# ║                                                                              ║
+# ║  # === DATABASE (PostgreSQL từ Coolify) ===                                  ║
+# ║  ConnectionStrings__DefaultConnection=Host=<POSTGRES_HOST>;Port=5432;Database=demif_db;Username=demif;Password=<PASSWORD>;
+# ║                                                                              ║
+# ║  # === JWT CONFIGURATION ===                                                 ║
+# ║  Jwt__Key=ThayDoiKeyNayItNhat32KyTuTroLenChoAnToan!                          ║
+# ║  Jwt__Issuer=Demif.Api                                                       ║
+# ║  Jwt__Audience=Demif.Client                                                  ║
+# ║  Jwt__ExpirationMinutes=60                                                   ║
+# ║                                                                              ║
+# ║  # === ASP.NET CORE ===                                                      ║
+# ║  ASPNETCORE_ENVIRONMENT=Production                                           ║
+# ║                                                                              ║
+# ║  # === FIREBASE (nếu cần) ===                                                ║
+# ║  # Firebase__project_id=your-project-id                                      ║
+# ║  # Firebase__private_key=-----BEGIN PRIVATE KEY-----\n...\n-----END...      ║
+# ║  # Firebase__client_email=firebase@your-project.iam.gserviceaccount.com      ║
+# ║                                                                              ║
+# ╠══════════════════════════════════════════════════════════════════════════════╣
+# ║  💡 HƯỚNG DẪN:                                                               ║
+# ║  1. Tạo PostgreSQL resource trên Coolify                                     ║
+# ║  2. Lấy Internal URL từ PostgreSQL settings → paste vào POSTGRES_HOST        ║
+# ║  3. Vào tab "Environment Variables" của API resource                         ║
+# ║  4. Paste các biến trên (bỏ dấu # ở đầu)                                     ║
+# ║  5. Click Save → Deploy                                                      ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+#
 
 services:
   # Main API Service

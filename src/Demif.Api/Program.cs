@@ -25,13 +25,24 @@ builder.Services.AddSwaggerConfiguration();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// CORS - Allow Frontend to access API
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 var app = builder.Build();
 
-// Configure pipeline
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwaggerConfiguration();
-}
+// Enable CORS
+app.UseCors("AllowAll");
+
+// Configure pipeline - Enable Swagger in all environments
+app.UseSwaggerConfiguration();
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
