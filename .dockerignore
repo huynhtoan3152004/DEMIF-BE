@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+.github
+
+# IDE
+.vs
+.vscode
+*.user
+*.suo
+
+# Build outputs
+**/bin
+**/obj
+**/out
+
+# Documentation
+docs
+*.md
+!README.md
+
+# Test files
+**/TestResults
+
+# Local environment files
+.env
+.env.local
+appsettings.Development.json
+appsettings.Local.json
+
+# Postman
+.postman
+postman
+
+# Misc
+*.log
+*.tmp
+Thumbs.db
