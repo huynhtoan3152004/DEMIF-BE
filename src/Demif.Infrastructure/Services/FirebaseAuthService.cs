@@ -15,50 +15,71 @@ namespace Demif.Infrastructure.Services;
 public class FirebaseAuthService : IFirebaseAuthService
 {
     private readonly ILogger<FirebaseAuthService> _logger;
+    private readonly IConfiguration _configuration;
+    private readonly object _lock = new object();
+    private bool _isInitialized = false;
+    private Exception? _initializationError;
 
     public FirebaseAuthService(IConfiguration configuration, ILogger<FirebaseAuthService> logger)
     {
         _logger = logger;
+        _configuration = configuration;
+    }
 
-        try
+    /// <summary>
+    /// Lazy initialization - chỉ khởi tạo khi cần dùng
+    /// </summary>
+    private void EnsureInitialized()
+    {
+        if (_isInitialized) return;
+
+        lock (_lock)
         {
-            // Khởi tạo Firebase App nếu chưa có
-            if (FirebaseApp.DefaultInstance == null)
+            if (_isInitialized) return;
+
+            try
             {
-                var firebaseConfig = configuration.GetSection("Firebase").Get<Dictionary<string, string>>();
-                
-                if (firebaseConfig == null || !firebaseConfig.ContainsKey("private_key"))
+                // Khởi tạo Firebase App nếu chưa có
+                if (FirebaseApp.DefaultInstance == null)
                 {
-                    throw new InvalidOperationException("Firebase configuration is missing or incomplete");
+                    var firebaseConfig = _configuration.GetSection("Firebase").Get<Dictionary<string, string>>();
+                    
+                    if (firebaseConfig == null || !firebaseConfig.ContainsKey("private_key"))
+                    {
+                        throw new InvalidOperationException("Firebase configuration is missing or incomplete");
+                    }
+
+                    // ✅ FIX: Xử lý private_key để có newlines thật
+                    var privateKey = firebaseConfig["private_key"];
+                    
+                    // Thay thế tất cả các dạng escape của newline
+                    privateKey = privateKey
+                        .Replace("\\\\n", "\n")  // \\n → \n
+                        .Replace("\\n", "\n");    // \n → newline thật
+                    
+                    // Build JSON manually để tránh escape lại
+                    var firebaseJson = BuildFirebaseJson(firebaseConfig, privateKey);
+
+                    // Log để debug (không log private_key)
+                    _logger.LogInformation("Initializing Firebase for project: {ProjectId}", 
+                        firebaseConfig["project_id"]);
+
+                    FirebaseApp.Create(new AppOptions
+                    {
+                        Credential = GoogleCredential.FromJson(firebaseJson)
+                    });
+
+                    _logger.LogInformation("✅ Firebase Admin SDK initialized successfully");
                 }
 
-                // ✅ FIX: Xử lý private_key để có newlines thật
-                var privateKey = firebaseConfig["private_key"];
-                
-                // Thay thế tất cả các dạng escape của newline
-                privateKey = privateKey
-                    .Replace("\\\\n", "\n")  // \\n → \n
-                    .Replace("\\n", "\n");    // \n → newline thật
-                
-                // Build JSON manually để tránh escape lại
-                var firebaseJson = BuildFirebaseJson(firebaseConfig, privateKey);
-
-                // Log để debug (không log private_key)
-                _logger.LogInformation("Initializing Firebase for project: {ProjectId}", 
-                    firebaseConfig["project_id"]);
-
-                FirebaseApp.Create(new AppOptions
-                {
-                    Credential = GoogleCredential.FromJson(firebaseJson)
-                });
-
-                _logger.LogInformation("✅ Firebase Admin SDK initialized successfully");
+                _isInitialized = true;
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "❌ Failed to initialize Firebase: {Message}", ex.Message);
-            throw;
+            catch (Exception ex)
+            {
+                _initializationError = ex;
+                _logger.LogError(ex, "❌ Failed to initialize Firebase: {Message}", ex.Message);
+                throw new InvalidOperationException("Firebase initialization failed. Check configuration and logs.", ex);
+            }
         }
     }
 
@@ -111,6 +132,8 @@ public class FirebaseAuthService : IFirebaseAuthService
     /// <inheritdoc />
     public async Task<FirebaseToken> VerifyIdTokenAsync(string idToken)
     {
+        EnsureInitialized();
+        
         try
         {
             var decodedToken = await FirebaseAuth.DefaultInstance.VerifyIdTokenAsync(idToken);
@@ -127,6 +150,8 @@ public class FirebaseAuthService : IFirebaseAuthService
     /// <inheritdoc />
     public async Task<UserRecord> GetUserByUidAsync(string uid)
     {
+        EnsureInitialized();
+        
         try
         {
             return await FirebaseAuth.DefaultInstance.GetUserAsync(uid);
@@ -141,6 +166,8 @@ public class FirebaseAuthService : IFirebaseAuthService
     /// <inheritdoc />
     public async Task<UserRecord> GetUserByEmailAsync(string email)
     {
+        EnsureInitialized();
+        
         try
         {
             return await FirebaseAuth.DefaultInstance.GetUserByEmailAsync(email);
