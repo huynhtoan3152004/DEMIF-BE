@@ -4,8 +4,17 @@ using Demif.Application.Features.Auth.Logout;
 using Demif.Application.Features.Auth.FirebaseLogin;
 using Demif.Application.Features.Auth.RefreshToken;
 using Demif.Application.Features.Auth.Register;
+using Demif.Application.Features.Lessons.Admin;
+using Demif.Application.Features.Lessons.GetLessonById;
+using Demif.Application.Features.Lessons.GetLessons;
+using Demif.Application.Features.Payments.Webhook;
 using Demif.Application.Features.Profile.GetMyProfile;
 using Demif.Application.Features.Profile.UpdateMyProfile;
+using Demif.Application.Features.Subscriptions.Admin;
+using Demif.Application.Features.Subscriptions.CancelSubscription;
+using Demif.Application.Features.Subscriptions.GetMySubscription;
+using Demif.Application.Features.Subscriptions.GetPlans;
+using Demif.Application.Features.Subscriptions.Subscribe;
 using Demif.Application.Features.Users.AssignRole;
 using Demif.Application.Features.Users.CreateUser;
 using Demif.Application.Features.Users.DeleteUser;
@@ -51,7 +60,23 @@ public static class DependencyInjection
         services.AddScoped<GetMyProfileService>();
         services.AddScoped<UpdateMyProfileService>();
 
+        // Subscription Services
+        services.AddScoped<GetPlansService>();
+        services.AddScoped<SubscribeService>();
+        services.AddScoped<GetMySubscriptionService>();
+        services.AddScoped<CancelSubscriptionService>();
+        services.AddScoped<AdminSubscriptionPlanService>();
+
+        // Lesson Services
+        services.AddScoped<GetLessonsService>();
+        services.AddScoped<GetLessonByIdService>();
+        services.AddScoped<AdminLessonService>();
+
+        // Payment Services
+        services.AddScoped<SePayWebhookService>();
+
         return services;
     }
 }
+
 

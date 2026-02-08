@@ -16,10 +16,20 @@ public class Lesson : AuditableEntity
     public Level Level { get; set; }
     public string? Category { get; set; } // conversation, business, travel, academic
 
-    // Media
+    // Media (linh hoạt cho cả audio và video)
     public string AudioUrl { get; set; } = string.Empty;
     public int DurationSeconds { get; set; }
     public string? ThumbnailUrl { get; set; }
+
+    /// <summary>
+    /// URL media thay thế (hỗ trợ cả MP3/MP4). Ưu tiên dùng field này.
+    /// </summary>
+    public string? MediaUrl { get; set; }
+
+    /// <summary>
+    /// Loại media: "audio" | "video"
+    /// </summary>
+    public string? MediaType { get; set; }
 
     // Content
     public string FullTranscript { get; set; } = string.Empty;
@@ -35,6 +45,21 @@ public class Lesson : AuditableEntity
     public decimal AvgScore { get; set; }
 
     public string Status { get; set; } = "published"; // draft, published, archived
+
+    /// <summary>
+    /// Chỉ user Premium mới xem được
+    /// </summary>
+    public bool IsPremiumOnly { get; set; }
+
+    /// <summary>
+    /// Thứ tự hiển thị trong danh sách
+    /// </summary>
+    public int DisplayOrder { get; set; }
+
+    /// <summary>
+    /// JSON array tags: ["business", "daily", "travel"]
+    /// </summary>
+    public string? Tags { get; set; }
 
     // Navigation
     public virtual ICollection<UserExercise> Exercises { get; set; } = new List<UserExercise>();
