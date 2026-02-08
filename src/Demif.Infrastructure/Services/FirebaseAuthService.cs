@@ -4,6 +4,7 @@ using FirebaseAdmin.Auth;
 using Google.Apis.Auth.OAuth2;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 namespace Demif.Infrastructure.Services;
 
@@ -19,21 +20,44 @@ public class FirebaseAuthService : IFirebaseAuthService
     {
         _logger = logger;
 
-        // Khởi tạo Firebase App nếu chưa có
-        if (FirebaseApp.DefaultInstance == null)
+        try
         {
-            var firebaseConfig = configuration.GetSection("Firebase").Get<Dictionary<string, string>>();
-            
-            // Tạo JSON credentials từ config
-            var firebaseJson = System.Text.Json.JsonSerializer.Serialize(firebaseConfig);
-
-            FirebaseApp.Create(new AppOptions
+            // Khởi tạo Firebase App nếu chưa có
+            if (FirebaseApp.DefaultInstance == null)
             {
-                Credential = GoogleCredential.FromJson(firebaseJson)
-            });
+                var firebaseConfig = configuration.GetSection("Firebase").Get<Dictionary<string, string>>();
+                
+                if (firebaseConfig == null || !firebaseConfig.ContainsKey("private_key"))
+                {
+                    throw new InvalidOperationException("Firebase configuration is missing or incomplete");
+                }
 
-            _logger.LogInformation("Firebase Admin SDK initialized successfully for project: {ProjectId}", 
-                firebaseConfig["project_id"]);
+                // ✅ FIX: Replace escaped newlines trong private_key
+                if (firebaseConfig.ContainsKey("private_key"))
+                {
+                    firebaseConfig["private_key"] = firebaseConfig["private_key"]
+                        .Replace("\\n", "\n"); // Convert \\n thành \n thật
+                }
+
+                // Serialize thành JSON
+                var firebaseJson = JsonSerializer.Serialize(firebaseConfig);
+
+                // Log để debug (không log private_key)
+                _logger.LogInformation("Initializing Firebase for project: {ProjectId}", 
+                    firebaseConfig["project_id"]);
+
+                FirebaseApp.Create(new AppOptions
+                {
+                    Credential = GoogleCredential.FromJson(firebaseJson)
+                });
+
+                _logger.LogInformation("✅ Firebase Admin SDK initialized successfully");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Failed to initialize Firebase: {Message}", ex.Message);
+            throw;
         }
     }
 
