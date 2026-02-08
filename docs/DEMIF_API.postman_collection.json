@@ -1,0 +1,981 @@
+{
+      "info": {
+            "_postman_id": "demif-api-collection",
+            "name": "DEMIF API",
+            "description": "Complete API collection for DEMIF Backend\n\n**Setup:**\n1. Import this collection\n2. Set base_url variable\n3. Run \"Login Admin\" first to get token\n4. All other requests will use the token automatically",
+            "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+      },
+      "variable": [
+            {
+                  "key": "base_url",
+                  "value": "http://localhost:8080"
+            },
+            {
+                  "key": "token",
+                  "value": ""
+            },
+            {
+                  "key": "user_id",
+                  "value": ""
+            },
+            {
+                  "key": "lesson_id",
+                  "value": ""
+            },
+            {
+                  "key": "plan_id",
+                  "value": ""
+            },
+            {
+                  "key": "role_id",
+                  "value": ""
+            }
+      ],
+      "auth": {
+            "type": "bearer",
+            "bearer": [
+                  {
+                        "key": "token",
+                        "value": "{{token}}",
+                        "type": "string"
+                  }
+            ]
+      },
+      "item": [
+            {
+                  "name": "🔐 Auth",
+                  "item": [
+                        {
+                              "name": "1. Login Admin",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "var jsonData = pm.response.json();",
+                                                      "if (jsonData.accessToken) {",
+                                                      "    pm.collectionVariables.set('token', jsonData.accessToken);",
+                                                      "    console.log('Token saved!');",
+                                                      "}",
+                                                      "if (jsonData.user && jsonData.user.id) {",
+                                                      "    pm.collectionVariables.set('user_id', jsonData.user.id);",
+                                                      "}",
+                                                      "",
+                                                      "pm.test('Login successful', function () {",
+                                                      "    pm.response.to.have.status(200);",
+                                                      "    pm.expect(jsonData.accessToken).to.be.a('string');",
+                                                      "});"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "auth": {
+                                          "type": "noauth"
+                                    },
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n    \"email\": \"toanadmin@demif.com\",\n    \"password\": \"123456\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/auth/login",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "auth",
+                                                "login"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "2. Register New User",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "pm.test('Registration successful', function () {",
+                                                      "    pm.response.to.have.status(200);",
+                                                      "});"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "auth": {
+                                          "type": "noauth"
+                                    },
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n    \"email\": \"testuser{{$randomInt}}@demif.com\",\n    \"password\": \"Test123456\",\n    \"username\": \"testuser{{$randomInt}}\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/auth/register",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "auth",
+                                                "register"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "3. Refresh Token",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n    \"refreshToken\": \"your-refresh-token-here\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/auth/refresh-token",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "auth",
+                                                "refresh-token"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "4. Logout",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/auth/logout",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "auth",
+                                                "logout"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "5. Change Password",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n    \"currentPassword\": \"123456\",\n    \"newPassword\": \"NewPass123456\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/auth/change-password",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "auth",
+                                                "change-password"
+                                          ]
+                                    }
+                              }
+                        }
+                  ]
+            },
+            {
+                  "name": "👤 Profile",
+                  "item": [
+                        {
+                              "name": "Get My Profile",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "pm.test('Profile retrieved', function () {",
+                                                      "    pm.response.to.have.status(200);",
+                                                      "});"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/profile/me",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "profile",
+                                                "me"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Update My Profile",
+                              "request": {
+                                    "method": "PUT",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n    \"username\": \"toanadmin\",\n    \"country\": \"Vietnam\",\n    \"nativeLanguage\": \"Vietnamese\",\n    \"targetLanguage\": \"English\",\n    \"currentLevel\": \"intermediate\",\n    \"dailyGoalMinutes\": 30\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/profile/me",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "profile",
+                                                "me"
+                                          ]
+                                    }
+                              }
+                        }
+                  ]
+            },
+            {
+                  "name": "📚 Lessons",
+                  "item": [
+                        {
+                              "name": "Get Lessons (Paginated)",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "var jsonData = pm.response.json();",
+                                                      "if (jsonData.items && jsonData.items.length > 0) {",
+                                                      "    pm.collectionVariables.set('lesson_id', jsonData.items[0].id);",
+                                                      "    console.log('Saved lesson_id:', jsonData.items[0].id);",
+                                                      "}",
+                                                      "pm.test('Lessons retrieved', function () {",
+                                                      "    pm.response.to.have.status(200);",
+                                                      "});"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "auth": {
+                                          "type": "noauth"
+                                    },
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons?page=1&pageSize=10",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons"
+                                          ],
+                                          "query": [
+                                                {
+                                                      "key": "page",
+                                                      "value": "1"
+                                                },
+                                                {
+                                                      "key": "pageSize",
+                                                      "value": "10"
+                                                }
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Get Lesson By ID",
+                              "request": {
+                                    "auth": {
+                                          "type": "noauth"
+                                    },
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/{{lesson_id}}",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "{{lesson_id}}"
+                                          ]
+                                    }
+                              }
+                        }
+                  ]
+            },
+            {
+                  "name": "💳 Subscriptions",
+                  "item": [
+                        {
+                              "name": "Get Plans",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "var jsonData = pm.response.json();",
+                                                      "if (jsonData.plans && jsonData.plans.length > 0) {",
+                                                      "    pm.collectionVariables.set('plan_id', jsonData.plans[0].id);",
+                                                      "    console.log('Saved plan_id:', jsonData.plans[0].id);",
+                                                      "}",
+                                                      "pm.test('Plans retrieved', function () {",
+                                                      "    pm.response.to.have.status(200);",
+                                                      "});"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "auth": {
+                                          "type": "noauth"
+                                    },
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/subscription-plans",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "subscription-plans"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Subscribe to Plan",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n    \"planId\": \"{{plan_id}}\",\n    \"autoRenew\": false\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/subscription-plans/subscribe",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "subscription-plans",
+                                                "subscribe"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Get My Subscription",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/subscription-plans/my-subscription",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "subscription-plans",
+                                                "my-subscription"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Cancel Subscription",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/subscription-plans/cancel",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "subscription-plans",
+                                                "cancel"
+                                          ]
+                                    }
+                              }
+                        }
+                  ]
+            },
+            {
+                  "name": "💰 Payments",
+                  "item": [
+                        {
+                              "name": "SEPay Webhook (Test)",
+                              "request": {
+                                    "auth": {
+                                          "type": "noauth"
+                                    },
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n    \"referenceCode\": \"DEMIF123456\",\n    \"amount\": 199000,\n    \"transactionId\": \"SEPAY-TXN-001\",\n    \"bankCode\": \"VCB\",\n    \"bankTransactionNo\": \"VCB123456789\",\n    \"description\": \"DEMIF123456 Premium Thang\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/payments/sepay/webhook",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "payments",
+                                                "sepay",
+                                                "webhook"
+                                          ]
+                                    }
+                              }
+                        }
+                  ]
+            },
+            {
+                  "name": "👑 Admin - Users",
+                  "item": [
+                        {
+                              "name": "Get All Users",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "var jsonData = pm.response.json();",
+                                                      "if (jsonData.items && jsonData.items.length > 1) {",
+                                                      "    pm.collectionVariables.set('user_id', jsonData.items[1].id);",
+                                                      "}",
+                                                      "pm.test('Users retrieved', function () {",
+                                                      "    pm.response.to.have.status(200);",
+                                                      "});"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/users?page=1&pageSize=10",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "users"
+                                          ],
+                                          "query": [
+                                                {
+                                                      "key": "page",
+                                                      "value": "1"
+                                                },
+                                                {
+                                                      "key": "pageSize",
+                                                      "value": "10"
+                                                }
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Get User By ID",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/users/{{user_id}}",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "users",
+                                                "{{user_id}}"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Create User",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n    \"email\": \"newuser{{$randomInt}}@demif.com\",\n    \"password\": \"Test123456\",\n    \"username\": \"newuser{{$randomInt}}\",\n    \"country\": \"Vietnam\",\n    \"currentLevel\": \"beginner\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/users",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "users"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Update User",
+                              "request": {
+                                    "method": "PUT",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n    \"username\": \"updateduser\",\n    \"country\": \"Japan\",\n    \"currentLevel\": \"intermediate\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/users/{{user_id}}",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "users",
+                                                "{{user_id}}"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Update User Status",
+                              "request": {
+                                    "method": "PATCH",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n    \"status\": \"active\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/users/{{user_id}}/status",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "users",
+                                                "{{user_id}}",
+                                                "status"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Delete User",
+                              "request": {
+                                    "method": "DELETE",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/users/{{user_id}}",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "users",
+                                                "{{user_id}}"
+                                          ]
+                                    }
+                              }
+                        }
+                  ]
+            },
+            {
+                  "name": "👑 Admin - Lessons",
+                  "item": [
+                        {
+                              "name": "Get All Lessons",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "var jsonData = pm.response.json();",
+                                                      "if (jsonData.items && jsonData.items.length > 0) {",
+                                                      "    pm.collectionVariables.set('lesson_id', jsonData.items[0].id);",
+                                                      "}",
+                                                      "pm.test('Admin lessons retrieved', function () {",
+                                                      "    pm.response.to.have.status(200);",
+                                                      "});"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons?page=1&pageSize=10",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons"
+                                          ],
+                                          "query": [
+                                                {
+                                                      "key": "page",
+                                                      "value": "1"
+                                                },
+                                                {
+                                                      "key": "pageSize",
+                                                      "value": "10"
+                                                }
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Create Lesson",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "var jsonData = pm.response.json();",
+                                                      "if (jsonData.id) {",
+                                                      "    pm.collectionVariables.set('lesson_id', jsonData.id);",
+                                                      "    console.log('New lesson_id:', jsonData.id);",
+                                                      "}",
+                                                      "pm.test('Lesson created', function () {",
+                                                      "    pm.response.to.have.status(201);",
+                                                      "});"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n    \"title\": \"Test Lesson - Business English\",\n    \"description\": \"Learn essential business vocabulary\",\n    \"lessonType\": \"dictation\",\n    \"level\": \"intermediate\",\n    \"category\": \"business\",\n    \"audioUrl\": \"https://example.com/audio/lesson1.mp3\",\n    \"durationSeconds\": 180,\n    \"fullTranscript\": \"Welcome to today's lesson on business communication.\",\n    \"dictationTemplate\": \"{\\\"segments\\\": []}\",\n    \"isPremiumOnly\": false,\n    \"displayOrder\": 1,\n    \"tags\": \"[\\\"business\\\", \\\"vocabulary\\\"]\",\n    \"status\": \"published\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Get Lesson By ID",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons",
+                                                "{{lesson_id}}"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Update Lesson",
+                              "request": {
+                                    "method": "PUT",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n    \"title\": \"Updated Lesson Title\",\n    \"description\": \"Updated description\",\n    \"lessonType\": \"dictation\",\n    \"level\": \"advanced\",\n    \"category\": \"business\",\n    \"audioUrl\": \"https://example.com/audio/lesson1.mp3\",\n    \"durationSeconds\": 200,\n    \"fullTranscript\": \"Updated transcript content.\",\n    \"isPremiumOnly\": true,\n    \"displayOrder\": 2,\n    \"status\": \"published\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons",
+                                                "{{lesson_id}}"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Delete Lesson",
+                              "request": {
+                                    "method": "DELETE",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons",
+                                                "{{lesson_id}}"
+                                          ]
+                                    }
+                              }
+                        }
+                  ]
+            },
+            {
+                  "name": "👑 Admin - Subscription Plans",
+                  "item": [
+                        {
+                              "name": "Get All Plans with Stats",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "var jsonData = pm.response.json();",
+                                                      "if (jsonData.plans && jsonData.plans.length > 0) {",
+                                                      "    pm.collectionVariables.set('plan_id', jsonData.plans[0].id);",
+                                                      "}",
+                                                      "pm.test('Admin plans retrieved', function () {",
+                                                      "    pm.response.to.have.status(200);",
+                                                      "});"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/subscription-plans",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "subscription-plans"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Get Stats Only",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/subscription-plans/stats",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "subscription-plans",
+                                                "stats"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Create Plan",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "var jsonData = pm.response.json();",
+                                                      "if (jsonData.id) {",
+                                                      "    pm.collectionVariables.set('plan_id', jsonData.id);",
+                                                      "}",
+                                                      "pm.test('Plan created', function () {",
+                                                      "    pm.response.to.have.status(201);",
+                                                      "});"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n    \"name\": \"Premium Test Plan\",\n    \"tier\": \"Premium\",\n    \"price\": 99000,\n    \"currency\": \"VND\",\n    \"billingCycle\": \"Monthly\",\n    \"durationDays\": 30,\n    \"features\": \"[\\\"Unlimited lessons\\\", \\\"AI Feedback\\\"]\",\n    \"badgeText\": \"Test\",\n    \"badgeColor\": \"#FF0000\",\n    \"isActive\": true\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/subscription-plans",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "subscription-plans"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Update Plan",
+                              "request": {
+                                    "method": "PUT",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n    \"name\": \"Premium Updated\",\n    \"tier\": \"Premium\",\n    \"price\": 149000,\n    \"currency\": \"VND\",\n    \"billingCycle\": \"Monthly\",\n    \"durationDays\": 30,\n    \"features\": \"[\\\"All features\\\"]\",\n    \"badgeText\": \"Popular\",\n    \"badgeColor\": \"#3B82F6\",\n    \"isActive\": true\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/subscription-plans/{{plan_id}}",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "subscription-plans",
+                                                "{{plan_id}}"
+                                          ]
+                                    }
+                              }
+                        },
+                        {
+                              "name": "Delete Plan",
+                              "request": {
+                                    "method": "DELETE",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/subscription-plans/{{plan_id}}",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "subscription-plans",
+                                                "{{plan_id}}"
+                                          ]
+                                    }
+                              }
+                        }
+                  ]
+            }
+      ]
+}
