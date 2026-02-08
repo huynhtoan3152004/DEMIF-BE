@@ -22,27 +22,14 @@ public class FirebaseAuthService : IFirebaseAuthService
         // Khởi tạo Firebase App nếu chưa có
         if (FirebaseApp.DefaultInstance == null)
         {
-            var firebaseConfig = configuration.GetSection("Firebase");
+            var firebaseConfig = configuration.GetSection("Firebase").Get<Dictionary<string, string>>();
             
             // Tạo JSON credentials từ config
-            var credentialJson = System.Text.Json.JsonSerializer.Serialize(new
-            {
-                type = firebaseConfig["type"],
-                project_id = firebaseConfig["project_id"],
-                private_key_id = firebaseConfig["private_key_id"],
-                private_key = firebaseConfig["private_key"],
-                client_email = firebaseConfig["client_email"],
-                client_id = firebaseConfig["client_id"],
-                auth_uri = firebaseConfig["auth_uri"],
-                token_uri = firebaseConfig["token_uri"],
-                auth_provider_x509_cert_url = firebaseConfig["auth_provider_x509_cert_url"],
-                client_x509_cert_url = firebaseConfig["client_x509_cert_url"],
-                universe_domain = firebaseConfig["universe_domain"]
-            });
+            var firebaseJson = System.Text.Json.JsonSerializer.Serialize(firebaseConfig);
 
             FirebaseApp.Create(new AppOptions
             {
-                Credential = GoogleCredential.FromJson(credentialJson)
+                Credential = GoogleCredential.FromJson(firebaseJson)
             });
 
             _logger.LogInformation("Firebase Admin SDK initialized successfully for project: {ProjectId}", 
