@@ -32,15 +32,16 @@ public class FirebaseAuthService : IFirebaseAuthService
                     throw new InvalidOperationException("Firebase configuration is missing or incomplete");
                 }
 
-                // ✅ FIX: Replace escaped newlines trong private_key
-                if (firebaseConfig.ContainsKey("private_key"))
-                {
-                    firebaseConfig["private_key"] = firebaseConfig["private_key"]
-                        .Replace("\\n", "\n"); // Convert \\n thành \n thật
-                }
-
-                // Serialize thành JSON
-                var firebaseJson = JsonSerializer.Serialize(firebaseConfig);
+                // ✅ FIX: Xử lý private_key để có newlines thật
+                var privateKey = firebaseConfig["private_key"];
+                
+                // Thay thế tất cả các dạng escape của newline
+                privateKey = privateKey
+                    .Replace("\\\\n", "\n")  // \\n → \n
+                    .Replace("\\n", "\n");    // \n → newline thật
+                
+                // Build JSON manually để tránh escape lại
+                var firebaseJson = BuildFirebaseJson(firebaseConfig, privateKey);
 
                 // Log để debug (không log private_key)
                 _logger.LogInformation("Initializing Firebase for project: {ProjectId}", 
@@ -59,6 +60,52 @@ public class FirebaseAuthService : IFirebaseAuthService
             _logger.LogError(ex, "❌ Failed to initialize Firebase: {Message}", ex.Message);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Build Firebase JSON manually để tránh JsonSerializer escape newlines
+    /// </summary>
+    private static string BuildFirebaseJson(Dictionary<string, string> config, string privateKey)
+    {
+        // Escape các ký tự đặc biệt NGOẠI TRỪ newline
+        string EscapeJsonValue(string value)
+        {
+            return value
+                .Replace("\\", "\\\\")  // \ → \\
+                .Replace("\"", "\\\"")  // " → \"
+                .Replace("\r", "")      // Remove carriage return
+                .Replace("\t", "\\t");  // Tab → \t
+        }
+
+        var jsonBuilder = new System.Text.StringBuilder();
+        jsonBuilder.AppendLine("{");
+        
+        bool isFirst = true;
+        foreach (var kvp in config)
+        {
+            if (!isFirst) jsonBuilder.AppendLine(",");
+            isFirst = false;
+
+            var value = kvp.Key == "private_key" ? privateKey : kvp.Value;
+            
+            // Escape value nhưng GIỮ NGUYÊN \n trong private_key
+            if (kvp.Key == "private_key")
+            {
+                // Đảm bảo private_key có \n thật, rồi escape cho JSON
+                value = value.Replace("\"", "\\\"");
+                jsonBuilder.Append($"  \"{kvp.Key}\": \"{value}\"");
+            }
+            else
+            {
+                value = EscapeJsonValue(value);
+                jsonBuilder.Append($"  \"{kvp.Key}\": \"{value}\"");
+            }
+        }
+        
+        jsonBuilder.AppendLine();
+        jsonBuilder.Append("}");
+        
+        return jsonBuilder.ToString();
     }
 
     /// <inheritdoc />
