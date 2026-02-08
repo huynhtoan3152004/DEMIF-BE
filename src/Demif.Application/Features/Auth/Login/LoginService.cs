@@ -79,7 +79,7 @@ public class LoginService
         var accessToken = _jwtTokenService.GenerateAccessToken(user.Id, user.Email, roles);
         var refreshTokenValue = _jwtTokenService.GenerateRefreshToken();
 
-        // 6. Lưu refresh token vào database
+        // 6. Tạo refresh token entity
         var refreshTokenDays = int.Parse(_configuration["Jwt:RefreshTokenExpirationDays"] ?? "7");
         var refreshToken = new Domain.Entities.RefreshToken
         {
@@ -88,13 +88,15 @@ public class LoginService
             ExpiresAt = DateTime.UtcNow.AddDays(refreshTokenDays),
             CreatedByIp = ipAddress
         };
-        await _refreshTokenRepository.AddAsync(refreshToken, cancellationToken);
+        _dbContext.RefreshTokens.Add(refreshToken);
 
         // 7. Cập nhật LastLoginAt
         user.LastLoginAt = DateTime.UtcNow;
+        
+        // 8. Lưu TẤT CẢ thay đổi 1 LẦN DUY NHẤT
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        // 8. Return response
+        // 9. Return response
         var expirationMinutes = int.Parse(_configuration["Jwt:ExpirationMinutes"] ?? "60");
         return new LoginResponse
         {

@@ -82,8 +82,6 @@ public class RegisterService
             LastLoginAt = DateTime.UtcNow
         };
 
-        await _userRepository.AddAsync(user, cancellationToken);
-
         // 5. Gán role mặc định
         var userRole = new UserRole
         {
@@ -98,7 +96,7 @@ public class RegisterService
         var accessToken = _jwtTokenService.GenerateAccessToken(user.Id, user.Email, roles);
         var refreshTokenValue = _jwtTokenService.GenerateRefreshToken();
 
-        // 7. Lưu refresh token vào database
+        // 7. Tạo refresh token entity
         var refreshTokenDays = int.Parse(_configuration["Jwt:RefreshTokenExpirationDays"] ?? "7");
         var refreshToken = new Domain.Entities.RefreshToken
         {
@@ -107,12 +105,15 @@ public class RegisterService
             ExpiresAt = DateTime.UtcNow.AddDays(refreshTokenDays),
             CreatedByIp = ipAddress
         };
-        await _refreshTokenRepository.AddAsync(refreshToken, cancellationToken);
 
-        // 8. Lưu tất cả thay đổi
+        // 8. Thêm user và refresh token vào context (CHƯA save)
+        _dbContext.Users.Add(user);
+        _dbContext.RefreshTokens.Add(refreshToken);
+
+        // 9. Lưu TẤT CẢ thay đổi 1 LẦN DUY NHẤT
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        // 9. Trả về response
+        // 10. Trả về response
         var expirationMinutes = int.Parse(_configuration["Jwt:ExpirationMinutes"] ?? "60");
         return new RegisterResponse
         {
