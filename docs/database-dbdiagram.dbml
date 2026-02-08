@@ -1,0 +1,318 @@
+// DEMIF Database Schema - dbdiagram.io
+// Paste this into https://dbdiagram.io/d
+
+// =====================================================
+// CORE TABLES
+// =====================================================
+
+Table Users {
+  Id uuid [pk]
+  Email varchar(255) [unique, not null]
+  PasswordHash varchar(255)
+  Username varchar(50) [unique, not null]
+  AvatarUrl varchar(500)
+  Status varchar(20) [default: 'active'] // active, suspended, banned
+  
+  // Profile
+  Country varchar(100)
+  NativeLanguage varchar(50) [default: 'Vietnamese']
+  TargetLanguage varchar(50) [default: 'English']
+  CurrentLevel varchar(20) [default: 'beginner']
+  DailyGoalMinutes int [default: 30]
+  
+  // Firebase
+  FirebaseUid varchar(128) [unique]
+  AuthProvider varchar(30) [default: 'email']
+  
+  Settings text // JSON
+  
+  CreatedAt datetime
+  UpdatedAt datetime
+  LastLoginAt datetime
+}
+
+Table Roles {
+  Id uuid [pk]
+  Name varchar(50) [unique, not null]
+  Description varchar(500)
+  IsDefault boolean [default: false]
+  IsActive boolean [default: true]
+  Permissions text // JSON
+  CreatedAt datetime
+  UpdatedAt datetime
+}
+
+Table UserRoles {
+  Id uuid [pk]
+  UserId uuid [not null, ref: > Users.Id]
+  RoleId uuid [not null, ref: > Roles.Id]
+  AssignedAt datetime
+  AssignedBy uuid
+  ExpiresAt datetime
+  CreatedAt datetime
+  UpdatedAt datetime
+  
+  indexes {
+    (UserId, RoleId) [unique]
+  }
+}
+
+// =====================================================
+// LESSONS & EXERCISES
+// =====================================================
+
+Table Lessons {
+  Id uuid [pk]
+  Title varchar(255) [not null]
+  Description text
+  
+  // Classification
+  LessonType varchar(20) [not null] // dictation, shadowing
+  Level varchar(20) [not null] // beginner, intermediate, advanced
+  Category varchar(50)
+  
+  // Media
+  AudioUrl varchar(500) [not null]
+  DurationSeconds int [not null]
+  ThumbnailUrl varchar(500)
+  MediaUrl varchar(500) // flexible video/audio URL
+  MediaType varchar(20) // audio, video
+  
+  // Content
+  FullTranscript text [not null]
+  DictationTemplate text // JSON template
+  
+  // Premium & Ordering
+  IsPremiumOnly boolean [default: false]
+  DisplayOrder int [default: 0]
+  Tags text // JSON array
+  
+  // Stats
+  CompletionsCount int [default: 0]
+  AvgScore decimal(5,2) [default: 0]
+  
+  Status varchar(20) [default: 'published']
+  CreatedAt datetime
+  UpdatedAt datetime
+}
+
+Table UserExercises {
+  Id uuid [pk]
+  UserId uuid [not null, ref: > Users.Id]
+  LessonId uuid [not null, ref: > Lessons.Id]
+  
+  ExerciseType varchar(20) [not null]
+  UserInput text
+  RecordingUrl varchar(500)
+  ResultDetails text // JSON
+  
+  Score int [not null]
+  TimeSpentSeconds int
+  Attempts int [default: 1]
+  PlaysUsed int [default: 1]
+  
+  CompletedAt datetime
+}
+
+// =====================================================
+// PROGRESS & GAMIFICATION
+// =====================================================
+
+Table UserProgress {
+  Id uuid [pk]
+  UserId uuid [unique, not null, ref: - Users.Id]
+  
+  TotalPoints int [default: 0]
+  TotalMinutes int [default: 0]
+  LessonsCompleted int [default: 0]
+  DictationCompleted int [default: 0]
+  ShadowingCompleted int [default: 0]
+  
+  AvgDictationScore decimal(5,2)
+  AvgShadowingScore decimal(5,2)
+  
+  Skills text // JSON
+  CurrentLevel varchar(20) [default: 'beginner']
+  LevelProgress int [default: 0]
+  
+  UpdatedAt datetime
+}
+
+Table UserStreaks {
+  Id uuid [pk]
+  UserId uuid [unique, not null, ref: - Users.Id]
+  
+  CurrentStreak int [default: 0]
+  LongestStreak int [default: 0]
+  LastActiveDate date
+  TotalActiveDays int [default: 0]
+  
+  FreezeCount int [default: 0]
+  FreezesAvailable int [default: 1]
+  
+  UpdatedAt datetime
+}
+
+// =====================================================
+// SUBSCRIPTIONS & PAYMENTS
+// =====================================================
+
+Table SubscriptionPlans {
+  Id uuid [pk]
+  Name varchar(100) [not null] // Premium Tháng, Năm, Vĩnh viễn
+  Tier varchar(20) [not null] // free, basic, premium
+  
+  Price decimal(18,2) [not null]
+  Currency varchar(10) [default: 'VND']
+  BillingCycle varchar(20) // monthly, yearly, lifetime
+  DurationDays int // null = lifetime
+  
+  Features text // JSON
+  Limits text // JSON
+  
+  BadgeText varchar(50)
+  BadgeColor varchar(20)
+  IsActive boolean [default: true]
+  
+  CreatedAt datetime
+  UpdatedAt datetime
+  
+  indexes {
+    (Tier, BillingCycle) [unique]
+  }
+}
+
+Table UserSubscriptions {
+  Id uuid [pk]
+  UserId uuid [not null, ref: > Users.Id]
+  PlanId uuid [not null, ref: > SubscriptionPlans.Id]
+  
+  StartDate datetime [not null]
+  EndDate datetime // null = lifetime
+  Status varchar(20) [default: 'active'] // active, expired, cancelled, pending
+  AutoRenew boolean [default: false]
+  
+  CreatedAt datetime
+  UpdatedAt datetime
+}
+
+Table Payments {
+  Id uuid [pk]
+  UserId uuid [not null, ref: > Users.Id]
+  PlanId uuid [not null, ref: > SubscriptionPlans.Id]
+  SubscriptionId uuid [ref: > UserSubscriptions.Id]
+  
+  Amount decimal(18,2) [not null]
+  Currency varchar(10) [default: 'VND']
+  
+  // SEPay
+  PaymentMethod varchar(50) [default: 'sepay_bank']
+  TransactionId varchar(100)
+  BankCode varchar(20)
+  BankTransactionNo varchar(100)
+  PaymentReference varchar(50) [unique, not null]
+  
+  Status varchar(20) [default: 'pending'] // pending, completed, failed, refunded
+  GatewayResponse text // JSON
+  
+  CreatedAt datetime
+  CompletedAt datetime
+  RefundedAt datetime
+  RefundReason varchar(500)
+}
+
+// =====================================================
+// VOCABULARY
+// =====================================================
+
+Table Vocabulary {
+  Id uuid [pk]
+  Word varchar(100) [not null]
+  Phonetic varchar(100)
+  AudioUrl varchar(500)
+  Translation varchar(255)
+  Definition text
+  ExampleSentence text
+  PartOfSpeech varchar(30)
+  Difficulty varchar(20) [default: 'medium']
+  Tags text // JSON
+  CreatedAt datetime
+}
+
+Table UserVocabulary {
+  Id uuid [pk]
+  UserId uuid [not null, ref: > Users.Id]
+  VocabularyId uuid [not null, ref: > Vocabulary.Id]
+  
+  MasteryLevel int [default: 0]
+  ReviewCount int [default: 0]
+  CorrectCount int [default: 0]
+  NextReviewAt datetime
+  EaseFactor decimal(3,2) [default: 2.5]
+  IntervalDays int [default: 1]
+  
+  Status varchar(20) [default: 'learning']
+  AddedAt datetime
+  LastReviewedAt datetime
+}
+
+// =====================================================
+// LEADERBOARD & ACTIVITY
+// =====================================================
+
+Table Leaderboard {
+  Id uuid [pk]
+  UserId uuid [not null, ref: > Users.Id]
+  
+  Username varchar(50)
+  AvatarUrl varchar(500)
+  Country varchar(100)
+  
+  TotalScore int [not null]
+  LessonsCompleted int
+  CurrentStreak int
+  Rank int
+  
+  Period varchar(20) [not null] // daily, weekly, monthly, alltime
+  CalculatedAt datetime
+}
+
+Table UserDailyActivity {
+  Id uuid [pk]
+  UserId uuid [not null, ref: > Users.Id]
+  ActivityDate date [not null]
+  
+  MinutesSpent int [default: 0]
+  ExercisesCompleted int [default: 0]
+  PointsEarned int [default: 0]
+  GoalAchieved boolean [default: false]
+  
+  Details text // JSON
+  
+  indexes {
+    (UserId, ActivityDate) [unique]
+  }
+}
+
+// =====================================================
+// FUTURE: ACHIEVEMENTS & NOTIFICATIONS
+// =====================================================
+
+Table Achievements {
+  Id uuid [pk]
+  Code varchar(50) [unique, not null]
+  Title varchar(100) [not null]
+  Description text
+  IconUrl varchar(500)
+  Points int [default: 0]
+  Category varchar(30)
+  Requirement text // JSON
+  Rarity varchar(20)
+}
+
+Table UserAchievements {
+  Id uuid [pk]
+  UserId uuid [not null, ref: > Users.Id]
+  AchievementId uuid [not null, ref: > Achievements.Id]
+  UnlockedAt datetime
+}

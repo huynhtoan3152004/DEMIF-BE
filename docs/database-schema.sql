@@ -105,10 +105,12 @@ CREATE TABLE Lessons (
     Level NVARCHAR(20) NOT NULL, -- beginner, intermediate, advanced
     Category NVARCHAR(50), -- conversation, business, travel, academic
     
-    -- Media (stored in Cloudflare R2)
+    -- Media (stored in Cloudflare R2 / any cloud storage)
     AudioUrl NVARCHAR(500) NOT NULL,
     DurationSeconds INT NOT NULL,
     ThumbnailUrl NVARCHAR(500),
+    MediaUrl NVARCHAR(500), -- URL video/audio linh hoạt (thay thế dần AudioUrl)
+    MediaType NVARCHAR(20), -- audio, video
     
     -- Content 
     FullTranscript NVARCHAR(MAX) NOT NULL,
@@ -116,6 +118,11 @@ CREATE TABLE Lessons (
     -- Cho DICTATION: Template với chỗ trống
     -- JSON: {"segments": [{"text": "I", "isBlank": false}, {"text": "___", "isBlank": true, "answer": "went", "hint": "w___"}]}
     DictationTemplate NVARCHAR(MAX),
+    
+    -- Premium & Ordering
+    IsPremiumOnly BIT DEFAULT 0, -- Chỉ user Premium mới xem được
+    DisplayOrder INT DEFAULT 0, -- Thứ tự hiển thị
+    Tags NVARCHAR(MAX), -- JSON array: ["business", "conversation"]
     
     -- Stats (denormalized for performance)
     CompletionsCount INT DEFAULT 0,
@@ -129,6 +136,8 @@ CREATE TABLE Lessons (
 CREATE INDEX IX_Lessons_Type_Level ON Lessons(LessonType, Level);
 CREATE INDEX IX_Lessons_Status ON Lessons(Status);
 CREATE INDEX IX_Lessons_Category ON Lessons(Category);
+CREATE INDEX IX_Lessons_IsPremiumOnly ON Lessons(IsPremiumOnly);
+CREATE INDEX IX_Lessons_DisplayOrder ON Lessons(DisplayOrder);
 
 -- 3. USER_EXERCISES (Kết quả làm bài - KHÔNG CÓ FK)
 CREATE TABLE UserExercises (
@@ -257,23 +266,29 @@ CREATE INDEX IX_UserVocabulary_Status ON UserVocabulary(Status);
 -- 8. SUBSCRIPTION_PLANS (Gói đăng ký)
 CREATE TABLE SubscriptionPlans (
     Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    Name NVARCHAR(100) NOT NULL, -- Miễn phí, Cơ bản, Premium
+    Name NVARCHAR(100) NOT NULL, -- Premium Tháng, Premium Năm, Premium Vĩnh viễn
     Tier NVARCHAR(20) NOT NULL, -- free, basic, premium
     
-    Price DECIMAL(12,2) NOT NULL,
-    Currency NVARCHAR(3) DEFAULT 'VND',
+    Price DECIMAL(18,2) NOT NULL,
+    Currency NVARCHAR(10) DEFAULT 'VND',
     BillingCycle NVARCHAR(20), -- monthly, yearly, lifetime
+    DurationDays INT, -- null = lifetime (vĩnh viễn)
     
     -- Features (JSON linh hoạt)
     Features NVARCHAR(MAX), -- JSON: ["Unlimited lessons", "AI feedback", "No ads"]
     Limits NVARCHAR(MAX), -- JSON: {"lessonsPerDay": 5, "aiRequests": 10}
     
     BadgeText NVARCHAR(50),
-    BadgeColor NVARCHAR(7),
+    BadgeColor NVARCHAR(20),
     IsActive BIT DEFAULT 1,
     
-    CreatedAt DATETIME2 DEFAULT GETUTCDATE()
+    CreatedAt DATETIME2 DEFAULT GETUTCDATE(),
+    UpdatedAt DATETIME2,
+    
+    CONSTRAINT UQ_SubscriptionPlans_Tier_Cycle UNIQUE (Tier, BillingCycle)
 );
+
+CREATE INDEX IX_SubscriptionPlans_IsActive ON SubscriptionPlans(IsActive);
 
 -- 9. USER_SUBSCRIPTIONS (Đăng ký của user)
 CREATE TABLE UserSubscriptions (
