@@ -15,6 +15,9 @@ public interface IApplicationDbContext
     DbSet<UserStreak> UserStreaks { get; }
     DbSet<Role> Roles { get; }
     DbSet<UserRole> UserRoles { get; }
+    DbSet<Post> Posts { get; }
+    DbSet<Comment> Comments { get; }
+    DbSet<PostLike> PostLikes { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

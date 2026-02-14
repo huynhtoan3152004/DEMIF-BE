@@ -1,6 +1,7 @@
 using Demif.Application.Features.Auth.Login;
 using Demif.Application.Features.Auth.FirebaseLogin;
 using FluentValidation;
+using Demif.Application.Features.Blog;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Demif.Application;
@@ -18,6 +19,7 @@ public static class DependencyInjection
         // Register Services (Feature services)
         services.AddScoped<LoginService>();
         services.AddScoped<FirebaseLoginService>();
+        services.AddScoped<BlogService>();
         // services.AddScoped<RegisterService>();
         // services.AddScoped<GetLessonsService>();
         // ... thêm các service khác

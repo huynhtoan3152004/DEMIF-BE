@@ -20,6 +20,9 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<UserStreak> UserStreaks => Set<UserStreak>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<Post> Posts => Set<Post>();
+    public DbSet<Comment> Comments => Set<Comment>();
+    public DbSet<PostLike> PostLikes => Set<PostLike>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
