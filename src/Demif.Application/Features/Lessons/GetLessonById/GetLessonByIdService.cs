@@ -61,7 +61,10 @@ public class GetLessonByIdService
             DurationSeconds = lesson.DurationSeconds,
             ThumbnailUrl = lesson.ThumbnailUrl,
             FullTranscript = lesson.FullTranscript,
-            DictationTemplate = lesson.DictationTemplate,
+            HasDictationExercise = !string.IsNullOrWhiteSpace(lesson.DictationTemplates),
+            AvailableDictationLevels = !string.IsNullOrWhiteSpace(lesson.DictationTemplates)
+                ? new List<string> { "Beginner", "Intermediate", "Advanced", "Expert" }
+                : null,
             IsPremiumOnly = lesson.IsPremiumOnly,
             CompletionsCount = lesson.CompletionsCount,
             AvgScore = lesson.AvgScore,

@@ -18,7 +18,14 @@ public class CreateUpdateLessonRequest
     public int DurationSeconds { get; set; }
     public string? ThumbnailUrl { get; set; }
     public string FullTranscript { get; set; } = string.Empty;
-    public string? DictationTemplate { get; set; }
+
+    /// <summary>
+    /// JSON array timed segments (optional).
+    /// Nếu admin không cung cấp, backend sẽ auto-generate từ FullTranscript + DurationSeconds.
+    /// Format: [{"startTime": 0.0, "endTime": 2.5, "text": "Hello everyone"}]
+    /// </summary>
+    public string? TimedTranscript { get; set; }
+
     public bool IsPremiumOnly { get; set; }
     public int DisplayOrder { get; set; }
     public string? Tags { get; set; }
@@ -42,7 +49,8 @@ public class AdminLessonDto
     public int DurationSeconds { get; set; }
     public string? ThumbnailUrl { get; set; }
     public string FullTranscript { get; set; } = string.Empty;
-    public string? DictationTemplate { get; set; }
+    public string? TimedTranscript { get; set; }
+    public bool HasDictationTemplates { get; set; }
     public bool IsPremiumOnly { get; set; }
     public int DisplayOrder { get; set; }
     public string? Tags { get; set; }

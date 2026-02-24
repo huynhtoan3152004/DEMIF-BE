@@ -5,7 +5,9 @@ using Demif.Application.Features.Auth.FirebaseLogin;
 using Demif.Application.Features.Auth.RefreshToken;
 using Demif.Application.Features.Auth.Register;
 using Demif.Application.Features.Lessons.Admin;
+using Demif.Application.Features.Lessons.GetDictationExercise;
 using Demif.Application.Features.Lessons.GetLessonById;
+using Demif.Application.Features.Lessons.SubmitDictation;
 using Demif.Application.Features.Lessons.GetLessons;
 using Demif.Application.Features.Payments.Webhook;
 using Demif.Application.Features.Profile.GetMyProfile;
@@ -70,6 +72,8 @@ public static class DependencyInjection
         // Lesson Services
         services.AddScoped<GetLessonsService>();
         services.AddScoped<GetLessonByIdService>();
+        services.AddScoped<GetDictationExerciseService>();
+        services.AddScoped<SubmitDictationService>();
         services.AddScoped<AdminLessonService>();
 
         // Payment Services

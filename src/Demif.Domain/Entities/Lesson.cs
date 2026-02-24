@@ -35,10 +35,18 @@ public class Lesson : AuditableEntity
     public string FullTranscript { get; set; } = string.Empty;
 
     /// <summary>
-    /// JSON template cho Dictation với chỗ trống
-    /// {"segments": [{"text": "I", "isBlank": false}, {"text": "___", "isBlank": true, "answer": "went", "hint": "w___"}]}
+    /// JSON array timed segments, auto-generated từ FullTranscript + DurationSeconds.
+    /// Format: [{"startTime": 0.0, "endTime": 2.5, "text": "Hello everyone welcome"}]
+    /// Admin có thể override nếu có subtitle file (VTT/SRT).
     /// </summary>
-    public string? DictationTemplate { get; set; }
+    public string? TimedTranscript { get; set; }
+
+    /// <summary>
+    /// JSON object chứa DictationTemplate cho mỗi Level.
+    /// Auto-generated bởi backend từ TimedTranscript.
+    /// Format: {"Beginner": {...}, "Intermediate": {...}, "Advanced": {...}, "Expert": {...}}
+    /// </summary>
+    public string? DictationTemplates { get; set; }
 
     // Stats (denormalized)
     public int CompletionsCount { get; set; }

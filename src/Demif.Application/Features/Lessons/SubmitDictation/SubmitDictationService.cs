@@ -1,0 +1,254 @@
+using System.Text.Json;
+using Demif.Application.Abstractions.Persistence;
+using Demif.Application.Abstractions.Repositories;
+using Demif.Application.Common.Models;
+using Demif.Domain.Entities;
+using Demif.Domain.Enums;
+using Microsoft.Extensions.Logging;
+
+namespace Demif.Application.Features.Lessons.SubmitDictation;
+
+/// <summary>
+/// Service xử lý submission dictation exercise + chấm điểm.
+/// So sánh case-insensitive, loại bỏ dấu câu, tính % chính xác.
+/// </summary>
+public class SubmitDictationService
+{
+    private readonly ILessonRepository _lessonRepository;
+    private readonly IApplicationDbContext _dbContext;
+    private readonly ILogger<SubmitDictationService> _logger;
+
+    public SubmitDictationService(
+        ILessonRepository lessonRepository,
+        IApplicationDbContext dbContext,
+        ILogger<SubmitDictationService> logger)
+    {
+        _lessonRepository = lessonRepository;
+        _dbContext = dbContext;
+        _logger = logger;
+    }
+
+    public async Task<Result<DictationSubmitResponse>> ExecuteAsync(
+        Guid lessonId,
+        Guid userId,
+        DictationSubmitRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        // 1. Tìm lesson
+        var lesson = await _lessonRepository.GetByIdAsync(lessonId, cancellationToken);
+        if (lesson is null)
+            return Result.Failure<DictationSubmitResponse>(Error.NotFound("Không tìm thấy bài học."));
+
+        if (string.IsNullOrWhiteSpace(lesson.DictationTemplates))
+            return Result.Failure<DictationSubmitResponse>(Error.NotFound("Bài học chưa có Dictation template."));
+
+        // 2. Parse level
+        if (!Enum.TryParse<Level>(request.Level, true, out var level))
+            return Result.Failure<DictationSubmitResponse>(Error.Validation($"Level '{request.Level}' không hợp lệ."));
+
+        // 3. Lấy template cho level
+        var template = DictationTemplateGenerator.GetTemplateForLevel(lesson.DictationTemplates, level);
+        if (template is null)
+            return Result.Failure<DictationSubmitResponse>(Error.NotFound($"Không tìm thấy template cho level '{level}'."));
+
+        // 4. Chấm điểm từng answer
+        var results = new List<AnswerResult>();
+        var correctCount = 0;
+
+        foreach (var userAnswer in request.Answers)
+        {
+            // Tìm segment + word tương ứng
+            if (userAnswer.SegmentIndex < 0 || userAnswer.SegmentIndex >= template.Segments.Count)
+            {
+                results.Add(new AnswerResult
+                {
+                    SegmentIndex = userAnswer.SegmentIndex,
+                    Position = userAnswer.Position,
+                    IsCorrect = false,
+                    UserInput = userAnswer.UserInput,
+                    CorrectAnswer = "?",
+                    Message = "Segment index không hợp lệ."
+                });
+                continue;
+            }
+
+            var segment = template.Segments[userAnswer.SegmentIndex];
+            var blankWord = segment.Words.FirstOrDefault(w => w.IsBlank && w.Position == userAnswer.Position);
+
+            if (blankWord is null)
+            {
+                results.Add(new AnswerResult
+                {
+                    SegmentIndex = userAnswer.SegmentIndex,
+                    Position = userAnswer.Position,
+                    IsCorrect = false,
+                    UserInput = userAnswer.UserInput,
+                    CorrectAnswer = "?",
+                    Message = "Vị trí blank không hợp lệ."
+                });
+                continue;
+            }
+
+            // So sánh case-insensitive, loại bỏ dấu câu + khoảng trắng thừa
+            var isCorrect = NormalizeForComparison(userAnswer.UserInput) ==
+                            NormalizeForComparison(blankWord.Answer ?? "");
+
+            if (isCorrect) correctCount++;
+
+            results.Add(new AnswerResult
+            {
+                SegmentIndex = userAnswer.SegmentIndex,
+                Position = userAnswer.Position,
+                IsCorrect = isCorrect,
+                UserInput = userAnswer.UserInput.Trim(),
+                CorrectAnswer = blankWord.Answer ?? "",
+                Message = isCorrect ? "Chính xác!" : null
+            });
+        }
+
+        // 5. Tính điểm
+        var totalBlanks = template.TotalBlanks;
+        var answeredBlanks = request.Answers.Count;
+        var score = totalBlanks > 0
+            ? (decimal)correctCount / totalBlanks * 100
+            : 0;
+
+        // 6. Lưu kết quả vào UserExercise
+        var exercise = new UserExercise
+        {
+            UserId = userId,
+            LessonId = lessonId,
+            ExerciseType = Domain.Enums.ExerciseType.Dictation,
+            // Lưu user answers vào UserInput
+            UserInput = JsonSerializer.Serialize(request.Answers, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            }),
+            // Lưu chi tiết kết quả
+            ResultDetails = JsonSerializer.Serialize(results, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            }),
+            Score = (int)Math.Round(score),
+            TimeSpentSeconds = request.TimeSpentSeconds,
+            CompletedAt = DateTime.UtcNow
+        };
+
+        _dbContext.UserExercises.Add(exercise);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "User {UserId} submitted dictation for lesson {LessonId} (Level: {Level}): {Score}% ({Correct}/{Total})",
+            userId, lessonId, level, Math.Round(score, 1), correctCount, totalBlanks);
+
+        return Result.Success(new DictationSubmitResponse
+        {
+            ExerciseId = exercise.Id,
+            Score = Math.Round(score, 1),
+            TotalBlanks = totalBlanks,
+            AnsweredBlanks = answeredBlanks,
+            CorrectCount = correctCount,
+            IncorrectCount = answeredBlanks - correctCount,
+            SkippedCount = totalBlanks - answeredBlanks,
+            Level = level.ToString(),
+            Results = results,
+            TimeSpentSeconds = request.TimeSpentSeconds
+        });
+    }
+
+    /// <summary>
+    /// Normalize string: lowercase, trim, bỏ dấu câu đầu/cuối
+    /// "Powerful." → "powerful", "  Hello " → "hello"
+    /// </summary>
+    private static string NormalizeForComparison(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return "";
+
+        return input.Trim()
+            .TrimEnd('.', ',', '!', '?', ';', ':', '\'', '"')
+            .TrimStart('\'', '"')
+            .ToLowerInvariant();
+    }
+}
+
+#region Request/Response DTOs
+
+/// <summary>
+/// Request body khi user submit dictation
+/// </summary>
+public class DictationSubmitRequest
+{
+    /// <summary>
+    /// Level đã chọn: "Beginner", "Intermediate", "Advanced", "Expert"
+    /// </summary>
+    public string Level { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Danh sách câu trả lời cho từng blank
+    /// </summary>
+    public List<UserAnswerInput> Answers { get; set; } = new();
+
+    /// <summary>
+    /// Thời gian user làm bài (giây)
+    /// </summary>
+    public int TimeSpentSeconds { get; set; }
+}
+
+/// <summary>
+/// Một câu trả lời cho 1 blank
+/// </summary>
+public class UserAnswerInput
+{
+    /// <summary>
+    /// Index của segment chứa blank (0-based)
+    /// </summary>
+    public int SegmentIndex { get; set; }
+
+    /// <summary>
+    /// Vị trí từ trong segment (match với DictationWord.Position)
+    /// </summary>
+    public int Position { get; set; }
+
+    /// <summary>
+    /// Từ user điền vào
+    /// </summary>
+    public string UserInput { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Response sau khi chấm điểm
+/// </summary>
+public class DictationSubmitResponse
+{
+    public Guid ExerciseId { get; set; }
+    public decimal Score { get; set; }
+    public int TotalBlanks { get; set; }
+    public int AnsweredBlanks { get; set; }
+    public int CorrectCount { get; set; }
+    public int IncorrectCount { get; set; }
+    public int SkippedCount { get; set; }
+    public string Level { get; set; } = string.Empty;
+    public int TimeSpentSeconds { get; set; }
+    public List<AnswerResult> Results { get; set; } = new();
+}
+
+/// <summary>
+/// Kết quả cho từng blank
+/// </summary>
+public class AnswerResult
+{
+    public int SegmentIndex { get; set; }
+    public int Position { get; set; }
+    public bool IsCorrect { get; set; }
+    public string UserInput { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Đáp án đúng — chỉ trả về sau khi submit
+    /// </summary>
+    public string CorrectAnswer { get; set; } = string.Empty;
+
+    public string? Message { get; set; }
+}
+
+#endregion

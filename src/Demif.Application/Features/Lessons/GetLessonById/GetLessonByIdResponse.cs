@@ -17,7 +17,8 @@ public class GetLessonByIdResponse
     public int DurationSeconds { get; set; }
     public string? ThumbnailUrl { get; set; }
     public string FullTranscript { get; set; } = string.Empty;
-    public string? DictationTemplate { get; set; }
+    public bool HasDictationExercise { get; set; }
+    public List<string>? AvailableDictationLevels { get; set; }
     public bool IsPremiumOnly { get; set; }
     public int CompletionsCount { get; set; }
     public decimal AvgScore { get; set; }

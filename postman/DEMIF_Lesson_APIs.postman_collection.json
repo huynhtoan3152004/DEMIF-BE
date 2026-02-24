@@ -1,0 +1,1406 @@
+{
+      "info": {
+            "name": "DEMIF - Lesson APIs",
+            "_postman_id": "demif-lesson-apis-v1",
+            "description": "Bộ Postman collection test tất cả Lesson APIs trong Demif-BE.\n\n## Hướng dẫn:\n1. **Import** file này vào Postman\n2. Chạy **0. Setup → Login (Admin)** trước để lấy token\n3. Token tự động lưu vào biến `{{admin_token}}`\n4. Test tuần tự theo số thứ tự: 1 → 2 → 3 → ...\n\n## Variables:\n- `base_url`: http://localhost:5077\n- `admin_token`: JWT token admin\n- `user_token`: JWT token user\n- `lesson_id`: ID lesson vừa tạo (auto-set)",
+            "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+      },
+      "variable": [
+            {
+                  "key": "base_url",
+                  "value": "http://localhost:5077",
+                  "type": "string"
+            },
+            {
+                  "key": "admin_token",
+                  "value": "",
+                  "type": "string"
+            },
+            {
+                  "key": "user_token",
+                  "value": "",
+                  "type": "string"
+            },
+            {
+                  "key": "lesson_id",
+                  "value": "",
+                  "type": "string"
+            },
+            {
+                  "key": "lesson_id_premium",
+                  "value": "",
+                  "type": "string"
+            }
+      ],
+      "item": [
+            {
+                  "name": "0. Setup - Authentication",
+                  "item": [
+                        {
+                              "name": "Register Admin Account",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"fullName\": \"Admin DEMIF\",\n  \"email\": \"admin@demif.com\",\n  \"password\": \"Admin@123456\",\n  \"confirmPassword\": \"Admin@123456\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/auth/register",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "auth",
+                                                "register"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "Login (Admin) → auto save token",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "if (pm.response.code === 200) {",
+                                                      "    var json = pm.response.json();",
+                                                      "    pm.collectionVariables.set('admin_token', json.accessToken || json.token);",
+                                                      "    console.log('✅ Admin token saved!');",
+                                                      "}"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"email\": \"admin@demif.com\",\n  \"password\": \"Admin@123456\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/auth/login",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "auth",
+                                                "login"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "Register User Account",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"fullName\": \"Test User\",\n  \"email\": \"user@demif.com\",\n  \"password\": \"User@123456\",\n  \"confirmPassword\": \"User@123456\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/auth/register",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "auth",
+                                                "register"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "Login (User) → auto save token",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "if (pm.response.code === 200) {",
+                                                      "    var json = pm.response.json();",
+                                                      "    pm.collectionVariables.set('user_token', json.accessToken || json.token);",
+                                                      "    console.log('✅ User token saved!');",
+                                                      "}"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"email\": \"user@demif.com\",\n  \"password\": \"User@123456\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/auth/login",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "auth",
+                                                "login"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        }
+                  ]
+            },
+            {
+                  "name": "1. Admin - Create Lessons",
+                  "item": [
+                        {
+                              "name": "✅ Create Lesson (Free, Beginner) → save lesson_id",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "if (pm.response.code === 201) {",
+                                                      "    var json = pm.response.json();",
+                                                      "    pm.collectionVariables.set('lesson_id', json.id);",
+                                                      "    console.log('✅ Lesson ID saved: ' + json.id);",
+                                                      "}"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          },
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"title\": \"Daily Conversation: At the Coffee Shop\",\n  \"description\": \"Practice everyday English used when ordering at a coffee shop. Learn common phrases and vocabulary.\",\n  \"lessonType\": 0,\n  \"level\": 0,\n  \"category\": \"daily\",\n  \"audioUrl\": \"https://storage.demif.com/lessons/coffee-shop.mp3\",\n  \"durationSeconds\": 35,\n  \"fullTranscript\": \"Good morning. Can I have a large coffee please? Sure, would you like cream and sugar? Yes, just a little sugar. That will be three dollars and fifty cents. Here you go. Thank you, have a nice day!\",\n  \"isPremiumOnly\": false,\n  \"displayOrder\": 1,\n  \"tags\": \"[\\\"daily\\\", \\\"conversation\\\", \\\"beginner\\\"]\",\n  \"status\": \"published\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "✅ Create Lesson (Premium, Advanced) → save lesson_id_premium",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "if (pm.response.code === 201) {",
+                                                      "    var json = pm.response.json();",
+                                                      "    pm.collectionVariables.set('lesson_id_premium', json.id);",
+                                                      "    console.log('✅ Premium Lesson ID saved: ' + json.id);",
+                                                      "}"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          },
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"title\": \"TED Talk: The Power of Vulnerability\",\n  \"description\": \"Challenge yourself with an advanced dictation exercise from a famous TED Talk.\",\n  \"lessonType\": 0,\n  \"level\": 2,\n  \"category\": \"academic\",\n  \"audioUrl\": \"https://storage.demif.com/lessons/ted-vulnerability.mp3\",\n  \"durationSeconds\": 75,\n  \"fullTranscript\": \"So I will start with this. A couple of years ago, an event planner called me because I was going to do a speaking event. And she called and said, I am really struggling with how to write about you on the little flyer. And I thought, well what is the struggle? She said, I saw you speak and I am going to call you a researcher. But I am afraid that if I call you a researcher, no one will come because they will think you are boring and irrelevant.\",\n  \"isPremiumOnly\": true,\n  \"displayOrder\": 2,\n  \"tags\": \"[\\\"academic\\\", \\\"ted-talk\\\", \\\"advanced\\\", \\\"premium\\\"]\",\n  \"status\": \"published\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "❌ Create Lesson - Missing Title (Validation Error)",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          },
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"title\": \"\",\n  \"description\": \"Test without title\",\n  \"lessonType\": 0,\n  \"level\": 0,\n  \"audioUrl\": \"https://example.com/audio.mp3\",\n  \"durationSeconds\": 10,\n  \"fullTranscript\": \"Hello.\",\n  \"status\": \"published\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "❌ Create Lesson - No Auth Token (401)",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"title\": \"Test No Auth\",\n  \"lessonType\": 0,\n  \"level\": 0,\n  \"audioUrl\": \"https://example.com/audio.mp3\",\n  \"durationSeconds\": 10,\n  \"fullTranscript\": \"Hello.\",\n  \"status\": \"published\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "❌ Create Lesson - User Token (403 Forbidden)",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          },
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"title\": \"Test With User Token\",\n  \"lessonType\": 0,\n  \"level\": 0,\n  \"audioUrl\": \"https://example.com/audio.mp3\",\n  \"durationSeconds\": 10,\n  \"fullTranscript\": \"Hello.\",\n  \"status\": \"published\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "✅ Create Lesson with Custom TimedTranscript (VTT)",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          },
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"title\": \"Lesson with Custom VTT Transcript\",\n  \"description\": \"Admin cung cấp TimedTranscript custom từ VTT file.\",\n  \"lessonType\": 0,\n  \"level\": 1,\n  \"category\": \"custom\",\n  \"audioUrl\": \"https://storage.demif.com/lessons/custom.mp3\",\n  \"durationSeconds\": 20,\n  \"fullTranscript\": \"Welcome to our class. Today we will learn about programming.\",\n  \"timedTranscript\": \"[{\\\"startTime\\\":0.0,\\\"endTime\\\":3.5,\\\"text\\\":\\\"Welcome to our class.\\\"},{\\\"startTime\\\":3.5,\\\"endTime\\\":8.0,\\\"text\\\":\\\"Today we will learn about programming.\\\"}]\",\n  \"isPremiumOnly\": false,\n  \"displayOrder\": 3,\n  \"status\": \"published\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        }
+                  ]
+            },
+            {
+                  "name": "2. Admin - Get Lessons",
+                  "item": [
+                        {
+                              "name": "✅ Get All Lessons (default pagination)",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "✅ Get All Lessons (page 1, size 5)",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons?page=1&pageSize=5",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons"
+                                          ],
+                                          "query": [
+                                                {
+                                                      "key": "page",
+                                                      "value": "1"
+                                                },
+                                                {
+                                                      "key": "pageSize",
+                                                      "value": "5"
+                                                }
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "✅ Get All Lessons - Filter by status",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons?status=published",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons"
+                                          ],
+                                          "query": [
+                                                {
+                                                      "key": "status",
+                                                      "value": "published"
+                                                }
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "✅ Get Lesson By ID",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons",
+                                                "{{lesson_id}}"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "❌ Get Lesson - Not Found (random GUID)",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons/00000000-0000-0000-0000-000000000000",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons",
+                                                "00000000-0000-0000-0000-000000000000"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        }
+                  ]
+            },
+            {
+                  "name": "3. Admin - Update Lesson",
+                  "item": [
+                        {
+                              "name": "✅ Update Lesson - Change Title & Transcript",
+                              "request": {
+                                    "method": "PUT",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          },
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"title\": \"Daily Conversation: At the Coffee Shop (Updated)\",\n  \"description\": \"Updated description - Practice ordering coffee with new vocabulary.\",\n  \"lessonType\": 0,\n  \"level\": 0,\n  \"category\": \"daily\",\n  \"audioUrl\": \"https://storage.demif.com/lessons/coffee-shop-v2.mp3\",\n  \"durationSeconds\": 40,\n  \"fullTranscript\": \"Good morning. I would like a large cappuccino please. Would you like whole milk or oat milk? Oat milk please. And can I also get a blueberry muffin? Of course. That will be six dollars and twenty five cents. Here is my card. Thank you very much. Have a wonderful day!\",\n  \"isPremiumOnly\": false,\n  \"displayOrder\": 1,\n  \"tags\": \"[\\\"daily\\\", \\\"conversation\\\", \\\"beginner\\\", \\\"updated\\\"]\",\n  \"status\": \"published\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons",
+                                                "{{lesson_id}}"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "❌ Update Lesson - Not Found",
+                              "request": {
+                                    "method": "PUT",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          },
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"title\": \"Non-existent\",\n  \"lessonType\": 0,\n  \"level\": 0,\n  \"audioUrl\": \"https://example.com/audio.mp3\",\n  \"durationSeconds\": 10,\n  \"fullTranscript\": \"Hello.\",\n  \"status\": \"published\"\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons/00000000-0000-0000-0000-000000000000",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons",
+                                                "00000000-0000-0000-0000-000000000000"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        }
+                  ]
+            },
+            {
+                  "name": "4. Admin - Regenerate Templates",
+                  "item": [
+                        {
+                              "name": "✅ Regenerate Templates",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}/regenerate-templates",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons",
+                                                "{{lesson_id}}",
+                                                "regenerate-templates"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "❌ Regenerate Templates - Not Found",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons/00000000-0000-0000-0000-000000000000/regenerate-templates",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons",
+                                                "00000000-0000-0000-0000-000000000000",
+                                                "regenerate-templates"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        }
+                  ]
+            },
+            {
+                  "name": "5. Public - Get Lessons",
+                  "item": [
+                        {
+                              "name": "✅ Get Lessons (no auth - public)",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "✅ Get Lessons - Filter by Level",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons?level=0&page=1&pageSize=10",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons"
+                                          ],
+                                          "query": [
+                                                {
+                                                      "key": "level",
+                                                      "value": "0"
+                                                },
+                                                {
+                                                      "key": "page",
+                                                      "value": "1"
+                                                },
+                                                {
+                                                      "key": "pageSize",
+                                                      "value": "10"
+                                                }
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "✅ Get Lessons - Filter by Category",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons?category=daily",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons"
+                                          ],
+                                          "query": [
+                                                {
+                                                      "key": "category",
+                                                      "value": "daily"
+                                                }
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "✅ Get Lesson By ID (Free lesson - no auth)",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/{{lesson_id}}",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "{{lesson_id}}"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "❌ Get Premium Lesson - No Auth (403)",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/{{lesson_id_premium}}",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "{{lesson_id_premium}}"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "❌ Get Lesson - Not Found",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/00000000-0000-0000-0000-000000000000",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "00000000-0000-0000-0000-000000000000"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        }
+                  ]
+            },
+            {
+                  "name": "6. Dictation Exercise - GET",
+                  "item": [
+                        {
+                              "name": "✅ Get Dictation - Beginner",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation?level=0",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "{{lesson_id}}",
+                                                "dictation"
+                                          ],
+                                          "query": [
+                                                {
+                                                      "key": "level",
+                                                      "value": "0"
+                                                }
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "✅ Get Dictation - Intermediate",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation?level=1",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "{{lesson_id}}",
+                                                "dictation"
+                                          ],
+                                          "query": [
+                                                {
+                                                      "key": "level",
+                                                      "value": "1"
+                                                }
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "✅ Get Dictation - Advanced",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation?level=2",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "{{lesson_id}}",
+                                                "dictation"
+                                          ],
+                                          "query": [
+                                                {
+                                                      "key": "level",
+                                                      "value": "2"
+                                                }
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "✅ Get Dictation - Expert",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation?level=3",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "{{lesson_id}}",
+                                                "dictation"
+                                          ],
+                                          "query": [
+                                                {
+                                                      "key": "level",
+                                                      "value": "3"
+                                                }
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "❌ Get Dictation - Premium (no auth → 403)",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/{{lesson_id_premium}}/dictation?level=0",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "{{lesson_id_premium}}",
+                                                "dictation"
+                                          ],
+                                          "query": [
+                                                {
+                                                      "key": "level",
+                                                      "value": "0"
+                                                }
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "❌ Get Dictation - Not Found",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/00000000-0000-0000-0000-000000000000/dictation?level=0",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "00000000-0000-0000-0000-000000000000",
+                                                "dictation"
+                                          ],
+                                          "query": [
+                                                {
+                                                      "key": "level",
+                                                      "value": "0"
+                                                }
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "🔍 Verify Answer = null (Security Check)",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "var json = pm.response.json();",
+                                                      "if (json.segments) {",
+                                                      "    json.segments.forEach(function(seg, si) {",
+                                                      "        seg.words.forEach(function(w, wi) {",
+                                                      "            if (w.isBlank) {",
+                                                      "                pm.test('Segment ' + si + ' Word ' + wi + ' answer is null', function() {",
+                                                      "                    pm.expect(w.answer).to.be.null;",
+                                                      "                });",
+                                                      "            }",
+                                                      "        });",
+                                                      "    });",
+                                                      "}"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation?level=0",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "{{lesson_id}}",
+                                                "dictation"
+                                          ],
+                                          "query": [
+                                                {
+                                                      "key": "level",
+                                                      "value": "0"
+                                                }
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        }
+                  ]
+            },
+            {
+                  "name": "7. Dictation Exercise - SUBMIT",
+                  "item": [
+                        {
+                              "name": "✅ Submit Dictation - All Correct (Beginner)",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          },
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"level\": \"Beginner\",\n  \"answers\": [\n    { \"segmentIndex\": 0, \"position\": 1, \"userInput\": \"morning\" },\n    { \"segmentIndex\": 1, \"position\": 3, \"userInput\": \"large\" }\n  ],\n  \"timeSpentSeconds\": 120\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation/submit",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "{{lesson_id}}",
+                                                "dictation",
+                                                "submit"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "✅ Submit Dictation - Mixed Answers",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          },
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"level\": \"Intermediate\",\n  \"answers\": [\n    { \"segmentIndex\": 0, \"position\": 1, \"userInput\": \"morning\" },\n    { \"segmentIndex\": 0, \"position\": 3, \"userInput\": \"wrong_answer\" },\n    { \"segmentIndex\": 1, \"position\": 2, \"userInput\": \"have\" }\n  ],\n  \"timeSpentSeconds\": 180\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation/submit",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "{{lesson_id}}",
+                                                "dictation",
+                                                "submit"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "✅ Submit Dictation - Case Insensitive",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          },
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"level\": \"Beginner\",\n  \"answers\": [\n    { \"segmentIndex\": 0, \"position\": 1, \"userInput\": \"MORNING\" },\n    { \"segmentIndex\": 1, \"position\": 3, \"userInput\": \"Large.\" }\n  ],\n  \"timeSpentSeconds\": 90\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation/submit",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "{{lesson_id}}",
+                                                "dictation",
+                                                "submit"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "✅ Submit Dictation - Empty Answers",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          },
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"level\": \"Beginner\",\n  \"answers\": [],\n  \"timeSpentSeconds\": 5\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation/submit",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "{{lesson_id}}",
+                                                "dictation",
+                                                "submit"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "❌ Submit Dictation - Invalid Level",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          },
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"level\": \"SuperHard\",\n  \"answers\": [\n    { \"segmentIndex\": 0, \"position\": 1, \"userInput\": \"test\" }\n  ],\n  \"timeSpentSeconds\": 10\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation/submit",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "{{lesson_id}}",
+                                                "dictation",
+                                                "submit"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "❌ Submit Dictation - Invalid Segment Index",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          },
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"level\": \"Beginner\",\n  \"answers\": [\n    { \"segmentIndex\": 999, \"position\": 0, \"userInput\": \"test\" }\n  ],\n  \"timeSpentSeconds\": 10\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation/submit",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "{{lesson_id}}",
+                                                "dictation",
+                                                "submit"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "❌ Submit Dictation - No Auth (401)",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"level\": \"Beginner\",\n  \"answers\": [\n    { \"segmentIndex\": 0, \"position\": 1, \"userInput\": \"test\" }\n  ],\n  \"timeSpentSeconds\": 10\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation/submit",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "{{lesson_id}}",
+                                                "dictation",
+                                                "submit"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "❌ Submit Dictation - Lesson Not Found",
+                              "request": {
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                          },
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\n  \"level\": \"Beginner\",\n  \"answers\": [\n    { \"segmentIndex\": 0, \"position\": 1, \"userInput\": \"test\" }\n  ],\n  \"timeSpentSeconds\": 10\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{base_url}}/api/lessons/00000000-0000-0000-0000-000000000000/dictation/submit",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "lessons",
+                                                "00000000-0000-0000-0000-000000000000",
+                                                "dictation",
+                                                "submit"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        }
+                  ]
+            },
+            {
+                  "name": "8. Admin - Delete Lesson",
+                  "item": [
+                        {
+                              "name": "✅ Delete Lesson (Soft Delete → archived)",
+                              "request": {
+                                    "method": "DELETE",
+                                    "header": [
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons",
+                                                "{{lesson_id}}"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "✅ Verify Lesson Archived (Get by ID after delete)",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons",
+                                                "{{lesson_id}}"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "❌ Delete Lesson - Not Found",
+                              "request": {
+                                    "method": "DELETE",
+                                    "header": [
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons/00000000-0000-0000-0000-000000000000",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons",
+                                                "00000000-0000-0000-0000-000000000000"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "✅ Get All Lessons - Filter archived",
+                              "request": {
+                                    "method": "GET",
+                                    "header": [
+                                          {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                          }
+                                    ],
+                                    "url": {
+                                          "raw": "{{base_url}}/api/admin/lessons?status=archived",
+                                          "host": [
+                                                "{{base_url}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "admin",
+                                                "lessons"
+                                          ],
+                                          "query": [
+                                                {
+                                                      "key": "status",
+                                                      "value": "archived"
+                                                }
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        }
+                  ]
+            }
+      ]
+}

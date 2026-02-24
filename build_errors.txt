@@ -1,0 +1,12 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Demif.Domain -> D:\WorkSpace\Demif-BE\src\Demif.Domain\bin\Debug\net8.0\Demif.Domain.dll
+  Demif.Application -> D:\WorkSpace\Demif-BE\src\Demif.Application\bin\Debug\net8.0\Demif.Application.dll
+  Demif.Infrastructure -> D:\WorkSpace\Demif-BE\src\Demif.Infrastructure\bin\Debug\net8.0\Demif.Infrastructure.dll
+  Demif.Api -> D:\WorkSpace\Demif-BE\src\Demif.Api\bin\Debug\net8.0\Demif.Api.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:02.95

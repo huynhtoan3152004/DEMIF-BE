@@ -58,7 +58,7 @@ public class AdminLessonsController : ControllerBase
     }
 
     /// <summary>
-    /// Tạo lesson mới
+    /// Tạo lesson mới (auto-generate DictationTemplates từ FullTranscript)
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> Create(
@@ -74,7 +74,7 @@ public class AdminLessonsController : ControllerBase
     }
 
     /// <summary>
-    /// Cập nhật lesson
+    /// Cập nhật lesson (re-generate templates nếu transcript thay đổi)
     /// </summary>
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(
@@ -114,5 +114,26 @@ public class AdminLessonsController : ControllerBase
         }
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// Re-generate DictationTemplates cho lesson hiện có
+    /// Hữu ích khi muốn refresh templates mà không thay đổi lesson data
+    /// </summary>
+    [HttpPost("{id:guid}/regenerate-templates")]
+    public async Task<IActionResult> RegenerateTemplates(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _adminService.RegenerateTemplatesAsync(id, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Code switch
+            {
+                "NotFound" => NotFound(new { error = result.Error.Message }),
+                _ => BadRequest(new { error = result.Error.Message })
+            };
+        }
+
+        return Ok(new { message = "DictationTemplates regenerated successfully." });
     }
 }

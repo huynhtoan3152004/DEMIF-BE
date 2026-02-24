@@ -36,6 +36,25 @@ public class LessonConfiguration : IEntityTypeConfiguration<Lesson>
         builder.Property(l => l.AvgScore)
             .HasPrecision(5, 2);
 
+        // New fields for Dictation system
+        builder.Property(l => l.TimedTranscript)
+            .HasColumnType("text");
+
+        builder.Property(l => l.DictationTemplates)
+            .HasColumnType("text");
+
+        builder.Property(l => l.MediaUrl)
+            .HasMaxLength(500);
+
+        builder.Property(l => l.MediaType)
+            .HasMaxLength(20);
+
+        builder.Property(l => l.FullTranscript)
+            .HasColumnType("text");
+
+        builder.Property(l => l.Tags)
+            .HasColumnType("text");
+
         // Indexes
         builder.HasIndex(l => new { l.LessonType, l.Level });
         builder.HasIndex(l => l.Status);
