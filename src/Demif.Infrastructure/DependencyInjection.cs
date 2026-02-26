@@ -2,6 +2,7 @@ using System.Text;
 using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Abstractions.Services;
+using Demif.Application.Features.Lessons.Admin;
 using Demif.Infrastructure.Persistence;
 using Demif.Infrastructure.Repositories;
 using Demif.Infrastructure.Services;
@@ -44,6 +45,10 @@ public static class DependencyInjection
         services.AddScoped<IDateTimeProvider, DateTimeProvider>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddSingleton<IFirebaseAuthService, FirebaseAuthService>();
+        services.AddSingleton<IFirebaseStorageService, FirebaseStorageService>();
+
+        // Lesson upload service
+        services.AddScoped<UploadLessonAudioService>();
 
         // HttpContextAccessor (for CurrentUserService)
         services.AddHttpContextAccessor();

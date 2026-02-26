@@ -1,5 +1,6 @@
 using Demif.Application.Features.Lessons.Admin;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Demif.Api.Controllers.Admin;
@@ -13,10 +14,14 @@ namespace Demif.Api.Controllers.Admin;
 public class AdminLessonsController : ControllerBase
 {
     private readonly AdminLessonService _adminService;
+    private readonly UploadLessonAudioService _uploadService;
 
-    public AdminLessonsController(AdminLessonService adminService)
+    public AdminLessonsController(
+        AdminLessonService adminService,
+        UploadLessonAudioService uploadService)
     {
         _adminService = adminService;
+        _uploadService = uploadService;
     }
 
     /// <summary>
@@ -139,5 +144,42 @@ public class AdminLessonsController : ControllerBase
         }
 
         return Ok(new { message = "DictationTemplates regenerated successfully." });
+    }
+
+    /// <summary>
+    /// Upload file MP3 lên Firebase Storage và gắn URL vào lesson.
+    /// POST /api/admin/lessons/{id}/upload-audio
+    /// Content-Type: multipart/form-data
+    /// Body: file (IFormFile)
+    /// </summary>
+    [HttpPost("{id:guid}/upload-audio")]
+    [RequestSizeLimit(52_428_800)] // 50MB
+    public async Task<IActionResult> UploadAudio(
+        Guid id,
+        IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(new { error = "Vui lòng chọn file âm thanh." });
+
+        await using var stream = file.OpenReadStream();
+
+        var result = await _uploadService.ExecuteAsync(
+            id,
+            stream,
+            file.FileName,
+            file.ContentType,
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Code switch
+            {
+                "NotFound" => NotFound(new { error = result.Error.Message }),
+                _ => BadRequest(new { error = result.Error.Message })
+            };
+        }
+
+        return Ok(result.Value);
     }
 }
