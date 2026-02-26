@@ -29,6 +29,10 @@ public class AdminLessonsController : ControllerBase
         [FromQuery] string? status = null,
         CancellationToken cancellationToken = default)
     {
+        // Clamp để tránh query nguy hiểm
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
         var result = await _adminService.GetAllAsync(page, pageSize, status, cancellationToken);
 
         if (result.IsFailure)

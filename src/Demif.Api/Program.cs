@@ -14,8 +14,14 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
-// Add services
-builder.Services.AddControllers();
+// Add services — Enable enum string support: FE can send "Beginner" OR 0
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Accept enum as string ("Beginner") or integer (0) in both request and response
+        options.JsonSerializerOptions.Converters.Add(
+            new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 
 // Swagger với JWT Bearer Authorization và XML Documentation

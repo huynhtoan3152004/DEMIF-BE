@@ -2,6 +2,7 @@ using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Common.Models;
 using Demif.Domain.Entities;
+using FluentValidation;
 using Microsoft.Extensions.Logging;
 
 namespace Demif.Application.Features.Lessons.Admin;
@@ -15,15 +16,18 @@ public class AdminLessonService
     private readonly ILessonRepository _lessonRepository;
     private readonly IApplicationDbContext _dbContext;
     private readonly ILogger<AdminLessonService> _logger;
+    private readonly IValidator<CreateUpdateLessonRequest> _validator;
 
     public AdminLessonService(
         ILessonRepository lessonRepository,
         IApplicationDbContext dbContext,
-        ILogger<AdminLessonService> logger)
+        ILogger<AdminLessonService> logger,
+        IValidator<CreateUpdateLessonRequest> validator)
     {
         _lessonRepository = lessonRepository;
         _dbContext = dbContext;
         _logger = logger;
+        _validator = validator;
     }
 
     /// <summary>
@@ -70,6 +74,12 @@ public class AdminLessonService
     /// </summary>
     public async Task<Result<Guid>> CreateAsync(CreateUpdateLessonRequest request, CancellationToken cancellationToken = default)
     {
+        var validation = await _validator.ValidateAsync(request, cancellationToken);
+        if (!validation.IsValid)
+        {
+            var errors = string.Join(" | ", validation.Errors.Select(e => e.ErrorMessage));
+            return Result.Failure<Guid>(Error.Validation(errors));
+        }
         var lesson = new Lesson
         {
             Title = request.Title,
@@ -104,6 +114,12 @@ public class AdminLessonService
     /// </summary>
     public async Task<Result> UpdateAsync(Guid id, CreateUpdateLessonRequest request, CancellationToken cancellationToken = default)
     {
+        var validation = await _validator.ValidateAsync(request, cancellationToken);
+        if (!validation.IsValid)
+        {
+            var errors = string.Join(" | ", validation.Errors.Select(e => e.ErrorMessage));
+            return Result.Failure(Error.Validation(errors));
+        }
         var lesson = await _lessonRepository.GetByIdAsync(id, cancellationToken);
         if (lesson is null)
         {

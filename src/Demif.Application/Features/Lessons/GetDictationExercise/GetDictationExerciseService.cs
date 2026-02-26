@@ -1,8 +1,6 @@
-using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Common.Models;
 using Demif.Domain.Enums;
-using Microsoft.EntityFrameworkCore;
 
 namespace Demif.Application.Features.Lessons.GetDictationExercise;
 
@@ -13,14 +11,14 @@ namespace Demif.Application.Features.Lessons.GetDictationExercise;
 public class GetDictationExerciseService
 {
     private readonly ILessonRepository _lessonRepository;
-    private readonly IApplicationDbContext _dbContext;
+    private readonly IUserSubscriptionRepository _subscriptionRepository;
 
     public GetDictationExerciseService(
         ILessonRepository lessonRepository,
-        IApplicationDbContext dbContext)
+        IUserSubscriptionRepository subscriptionRepository)
     {
         _lessonRepository = lessonRepository;
-        _dbContext = dbContext;
+        _subscriptionRepository = subscriptionRepository;
     }
 
     public async Task<Result<DictationExerciseResponse>> ExecuteAsync(
@@ -35,24 +33,21 @@ public class GetDictationExerciseService
             return Result.Failure<DictationExerciseResponse>(Error.NotFound("Không tìm thấy bài học."));
         }
 
-        // Kiểm tra premium access
-        if (lesson.IsPremiumOnly && userId.HasValue)
+        // Kiểm tra premium access (nhất quán với GetLessonsService + GetLessonByIdService)
+        if (lesson.IsPremiumOnly)
         {
-            var hasPremium = await _dbContext.UserRoles
-                .AnyAsync(ur => ur.UserId == userId.Value &&
-                    ur.Role.Name == "Premium" &&
-                    (ur.ExpiresAt == null || ur.ExpiresAt > DateTime.UtcNow), cancellationToken);
+            if (!userId.HasValue)
+            {
+                return Result.Failure<DictationExerciseResponse>(
+                    Error.Forbidden("Bài học này chỉ dành cho Premium. Vui lòng đăng nhập và nâng cấp tài khoản."));
+            }
 
+            var hasPremium = await _subscriptionRepository.HasActiveSubscriptionAsync(userId.Value, cancellationToken);
             if (!hasPremium)
             {
                 return Result.Failure<DictationExerciseResponse>(
                     Error.Forbidden("Bài học này chỉ dành cho Premium. Vui lòng nâng cấp tài khoản."));
             }
-        }
-        else if (lesson.IsPremiumOnly && !userId.HasValue)
-        {
-            return Result.Failure<DictationExerciseResponse>(
-                Error.Forbidden("Bài học này chỉ dành cho Premium. Vui lòng đăng nhập và nâng cấp tài khoản."));
         }
 
         // Kiểm tra lesson có DictationTemplates

@@ -33,13 +33,18 @@ public class LessonsController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy danh sách lessons với pagination
+    /// Lấy danh sách lessons với pagination.
+    /// Hỗ trợ filter: level (string "Beginner" hoặc số 0), type, category.
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetLessons(
         [FromQuery] GetLessonsRequest request,
         CancellationToken cancellationToken)
     {
+        // Clamp pagination để tránh query quá lớn
+        request.Page = Math.Max(1, request.Page);
+        request.PageSize = Math.Clamp(request.PageSize, 1, 100);
+
         var userId = GetUserIdOrNull();
         var result = await _getLessonsService.ExecuteAsync(request, userId, cancellationToken);
 
@@ -50,7 +55,7 @@ public class LessonsController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy chi tiết lesson (kiểm tra premium access)
+    /// Lấy chi tiết lesson (kiểm tra premium access).
     /// </summary>
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetLessonById(Guid id, CancellationToken cancellationToken)
@@ -73,14 +78,25 @@ public class LessonsController : ControllerBase
 
     /// <summary>
     /// Lấy dictation exercise (blanks KHÔNG có đáp án).
-    /// GET /api/lessons/{id}/dictation?level=Beginner
+    /// GET /api/lessons/{id}/dictation?level=Beginner (hoặc ?level=0)
     /// </summary>
     [HttpGet("{id:guid}/dictation")]
     public async Task<IActionResult> GetDictationExercise(
         Guid id,
-        [FromQuery] Level level = Level.Beginner,
+        [FromQuery] string levelStr = "Beginner",
         CancellationToken cancellationToken = default)
     {
+        // Accept both "Beginner"/0/1/2/3 — parse linh hoạt
+        Level level;
+        if (int.TryParse(levelStr, out var levelInt) && Enum.IsDefined(typeof(Level), levelInt))
+        {
+            level = (Level)levelInt;
+        }
+        else if (!Enum.TryParse<Level>(levelStr, ignoreCase: true, out level))
+        {
+            return BadRequest(new { error = $"Level '{levelStr}' không hợp lệ. Dùng: Beginner, Intermediate, Advanced, Expert (hoặc 0,1,2,3)." });
+        }
+
         var userId = GetUserIdOrNull();
         var result = await _getDictationExerciseService.ExecuteAsync(id, level, userId, cancellationToken);
 
@@ -100,7 +116,7 @@ public class LessonsController : ControllerBase
     /// <summary>
     /// Submit dictation answers → chấm điểm + lưu kết quả.
     /// POST /api/lessons/{id}/dictation/submit
-    /// User điền hết blanks → submit 1 lần → nhận kết quả + đáp án đúng.
+    /// Level trong body: "Beginner"/"Intermediate"/"Advanced"/"Expert"
     /// </summary>
     [HttpPost("{id:guid}/dictation/submit")]
     [Authorize]
@@ -109,13 +125,10 @@ public class LessonsController : ControllerBase
         [FromBody] DictationSubmitRequest request,
         CancellationToken cancellationToken)
     {
-        var userId = GetUserIdOrNull();
-        if (!userId.HasValue)
-        {
-            return Unauthorized(new { error = "Vui lòng đăng nhập để nộp bài." });
-        }
+        // userId guaranteed by [Authorize]
+        var userId = GetUserIdOrNull()!.Value;
 
-        var result = await _submitDictationService.ExecuteAsync(id, userId.Value, request, cancellationToken);
+        var result = await _submitDictationService.ExecuteAsync(id, userId, request, cancellationToken);
 
         if (result.IsFailure)
         {
@@ -136,3 +149,4 @@ public class LessonsController : ControllerBase
         return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
     }
 }
+
