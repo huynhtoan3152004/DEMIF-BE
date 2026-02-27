@@ -2,6 +2,7 @@ using System.Text;
 using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Abstractions.Services;
+using Demif.Application.Features.Blogs.CreateBlog;
 using Demif.Application.Features.Lessons.Admin;
 using Demif.Infrastructure.Persistence;
 using Demif.Infrastructure.Repositories;
@@ -38,6 +39,7 @@ public static class DependencyInjection
         services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
         services.AddScoped<IUserSubscriptionRepository, UserSubscriptionRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddScoped<IBlogRepository, BlogRepository>();
 
         // Services
         services.AddScoped<IJwtTokenService, JwtTokenService>();
@@ -46,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddSingleton<IFirebaseAuthService, FirebaseAuthService>();
         services.AddSingleton<IFirebaseStorageService, FirebaseStorageService>();
+        services.AddScoped<ICreateBlogService, CreateBlogService>();
 
         // Lesson upload service
         services.AddScoped<UploadLessonAudioService>();

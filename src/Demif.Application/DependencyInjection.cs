@@ -25,6 +25,11 @@ using Demif.Application.Features.Users.GetUsers;
 using Demif.Application.Features.Users.RemoveRole;
 using Demif.Application.Features.Users.UpdateUser;
 using Demif.Application.Features.Users.UpdateUserStatus;
+using Demif.Application.Features.Blogs.CreateBlog;
+using Demif.Application.Features.Blogs.GetBlogs;
+using Demif.Application.Features.Blogs.GetBlogById;
+using Demif.Application.Features.Blogs.UpdateBlog;
+using Demif.Application.Features.Blogs.DeleteBlog;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -78,6 +83,13 @@ public static class DependencyInjection
 
         // Payment Services
         services.AddScoped<SePayWebhookService>();
+
+        //Blog Services
+        services.AddScoped<ICreateBlogService, CreateBlogService>();
+        services.AddScoped<IGetBlogsService, GetBlogsService>();
+        services.AddScoped<IGetBlogByIdService, GetBlogByIdService>();
+        services.AddScoped<IUpdateBlogService, UpdateBlogService>();
+        services.AddScoped<IDeleteBlogService, DeleteBlogService>();
 
         return services;
     }
