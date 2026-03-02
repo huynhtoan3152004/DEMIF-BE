@@ -5,38 +5,40 @@ using Demif.Application.Common.Models;
 using Demif.Domain.Entities;
 using Demif.Domain.Enums;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Demif.Application.Features.Auth.Register;
 
 /// <summary>
-/// Register Service - xử lý logic đăng ký tài khoản mới
+/// Register Service — tạo tài khoản mới + gửi email xác nhận.
+/// KHÔNG cấp JWT ngay — user phải verify email trước.
 /// </summary>
 public class RegisterService
 {
     private readonly IUserRepository _userRepository;
     private readonly IRoleRepository _roleRepository;
-    private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IPasswordHasher _passwordHasher;
-    private readonly IJwtTokenService _jwtTokenService;
     private readonly IApplicationDbContext _dbContext;
+    private readonly IEmailService _emailService;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<RegisterService> _logger;
 
     public RegisterService(
         IUserRepository userRepository,
         IRoleRepository roleRepository,
-        IRefreshTokenRepository refreshTokenRepository,
         IPasswordHasher passwordHasher,
-        IJwtTokenService jwtTokenService,
         IApplicationDbContext dbContext,
-        IConfiguration configuration)
+        IEmailService emailService,
+        IConfiguration configuration,
+        ILogger<RegisterService> logger)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
-        _refreshTokenRepository = refreshTokenRepository;
         _passwordHasher = passwordHasher;
-        _jwtTokenService = jwtTokenService;
         _dbContext = dbContext;
+        _emailService = emailService;
         _configuration = configuration;
+        _logger = logger;
     }
 
     public async Task<Result<RegisterResponse>> ExecuteAsync(
@@ -44,45 +46,43 @@ public class RegisterService
         string? ipAddress = null,
         CancellationToken cancellationToken = default)
     {
-        // 1. Kiểm tra email đã tồn tại chưa
+        // 1. Check email tồn tại
         if (await _userRepository.ExistsEmailAsync(request.Email, cancellationToken))
-        {
             return Result.Failure<RegisterResponse>(Error.Conflict("Email đã tồn tại."));
-        }
 
-        // 2. Kiểm tra username đã tồn tại chưa
+        // 2. Check username tồn tại
         if (await _userRepository.ExistsUsernameAsync(request.Username, cancellationToken))
-        {
             return Result.Failure<RegisterResponse>(Error.Conflict("Tên người dùng đã tồn tại."));
-        }
 
-        // 3. Lấy role mặc định (User)
-        var defaultRole = await _roleRepository.GetDefaultRoleAsync(cancellationToken);
+        // 3. Lấy default role
+        var defaultRole = await _roleRepository.GetDefaultRoleAsync(cancellationToken)
+            ?? await _roleRepository.GetByNameAsync("User", cancellationToken);
+
         if (defaultRole is null)
-        {
-            // Fallback: tìm role "User"
-            defaultRole = await _roleRepository.GetByNameAsync("User", cancellationToken);
-            if (defaultRole is null)
-            {
-                return Result.Failure<RegisterResponse>(Error.Internal("Chưa cấu hình vai trò mặc định."));
-            }
-        }
+            return Result.Failure<RegisterResponse>(Error.Internal("Chưa cấu hình vai trò mặc định."));
 
-        // 4. Tạo user mới
+        // 4. Tạo verification token (hết hạn 24h)
+        var verificationToken = Convert.ToBase64String(Guid.NewGuid().ToByteArray())
+            .Replace("+", "-").Replace("/", "_").Replace("=", "");
+
+        // 5. Tạo user mới — Status = Pending cho đến khi verify email
         var user = new User
         {
             Email = request.Email.ToLower().Trim(),
             Username = request.Username.Trim(),
             PasswordHash = _passwordHasher.Hash(request.Password),
-            Status = UserStatus.Active,
+            Status = UserStatus.Pending,
             Country = request.Country,
             NativeLanguage = request.NativeLanguage,
             TargetLanguage = request.TargetLanguage,
             AuthProvider = "email",
-            LastLoginAt = DateTime.UtcNow
+            IsEmailVerified = false,
+            EmailVerificationToken = verificationToken,
+            EmailVerificationExpiry = DateTime.UtcNow.AddHours(24),
+            LastLoginAt = null
         };
 
-        // 5. Gán role mặc định
+        // 6. Gán role mặc định
         var userRole = new UserRole
         {
             UserId = user.Id,
@@ -91,39 +91,24 @@ public class RegisterService
         };
         user.UserRoles.Add(userRole);
 
-        // 6. Tạo tokens
-        var roles = new List<string> { defaultRole.Name };
-        var accessToken = _jwtTokenService.GenerateAccessToken(user.Id, user.Email, roles);
-        var refreshTokenValue = _jwtTokenService.GenerateRefreshToken();
-
-        // 7. Tạo refresh token entity
-        var refreshTokenDays = int.Parse(_configuration["Jwt:RefreshTokenExpirationDays"] ?? "7");
-        var refreshToken = new Domain.Entities.RefreshToken
-        {
-            Token = refreshTokenValue,
-            UserId = user.Id,
-            ExpiresAt = DateTime.UtcNow.AddDays(refreshTokenDays),
-            CreatedByIp = ipAddress
-        };
-
-        // 8. Thêm user và refresh token vào context (CHƯA save)
         _dbContext.Users.Add(user);
-        _dbContext.RefreshTokens.Add(refreshToken);
-
-        // 9. Lưu TẤT CẢ thay đổi 1 LẦN DUY NHẤT
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        // 10. Trả về response
-        var expirationMinutes = int.Parse(_configuration["Jwt:ExpirationMinutes"] ?? "60");
-        return new RegisterResponse
+        // 7. Gửi email xác nhận
+        var frontendUrl = _configuration["App:FrontendUrl"] ?? "http://localhost:3000";
+        var verifyUrl = $"{frontendUrl}/auth/verify-email?token={verificationToken}";
+
+        await _emailService.SendEmailVerificationAsync(user.Email, user.Username, verifyUrl, cancellationToken);
+
+        _logger.LogInformation("New user registered: {UserId}, email verification sent.", user.Id);
+
+        return Result.Success(new RegisterResponse
         {
             UserId = user.Id,
             Email = user.Email,
             Username = user.Username,
-            AccessToken = accessToken,
-            RefreshToken = refreshTokenValue,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(expirationMinutes),
-            Roles = roles
-        };
+            Message = "Đăng ký thành công! Vui lòng kiểm tra email để xác nhận tài khoản.",
+            RequiresEmailVerification = true
+        });
     }
 }

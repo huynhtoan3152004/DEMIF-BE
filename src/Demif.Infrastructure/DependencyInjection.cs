@@ -44,7 +44,8 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IDateTimeProvider, DateTimeProvider>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
-        services.AddSingleton<IFirebaseAuthService, FirebaseAuthService>();
+        services.AddSingleton<IGoogleAuthService, GoogleAuthService>();
+        services.AddScoped<IEmailService, SmtpEmailService>();
         services.AddSingleton<IFirebaseStorageService, FirebaseStorageService>();
 
         // Lesson upload service

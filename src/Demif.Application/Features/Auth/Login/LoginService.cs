@@ -52,16 +52,17 @@ public class LoginService
         }
 
         // 2. Kiểm tra user status
-        if (user.Status != UserStatus.Active)
-        {
-            return Result.Failure<LoginResponse>(Error.Unauthorized("Tài khoản của bạn chưa được kích hoạt."));
-        }
+        if (user.Status == UserStatus.Banned)
+            return Result.Failure<LoginResponse>(Error.Unauthorized("Tài khoản đã bị khóa."));
 
-        // 3. Verify password
+        // 3. Kiểm tra email đã xác nhận chưa
+        if (!user.IsEmailVerified)
+            return Result.Failure<LoginResponse>(new Error("Auth.EmailNotVerified",
+                "Vui lòng kiểm tra email và xác nhập tài khoản trước khi đăng nhập."));
+
+        // 4. Verify password
         if (user.PasswordHash is null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
-        {
             return Result.Failure<LoginResponse>(Error.Unauthorized("Email hoặc mật khẩu không đúng."));
-        }
 
         // 4. Lấy danh sách roles
         var roles = user.UserRoles
