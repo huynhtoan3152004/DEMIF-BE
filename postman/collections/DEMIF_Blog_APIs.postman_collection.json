@@ -1,0 +1,317 @@
+{
+      "info": {
+            "_postman_id": "b0a5f8e0-1c2d-4e3f-a5b6-c7d8e9f0a1b2",
+            "name": "DEMIF Blog APIs",
+            "description": "Collection for testing the Blog API endpoints in the DEMIF English learning system.",
+            "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+      },
+      "item": [
+            {
+                  "name": "Blog",
+                  "item": [
+                        {
+                              "name": "1. Get All Posts",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "pm.test(\"Status code is 200\", function () {",
+                                                      "    pm.response.to.have.status(200);",
+                                                      "});",
+                                                      "",
+                                                      "pm.test(\"Response has data array\", function () {",
+                                                      "    var jsonData = pm.response.json();",
+                                                      "    pm.expect(jsonData.data).to.be.an('array');",
+                                                      "    if (jsonData.data.length > 0) {",
+                                                      "        pm.collectionVariables.set(\"post_id\", jsonData.data[0].id);",
+                                                      "    }",
+                                                      "});"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{baseUrl}}/api/Blog",
+                                          "host": [
+                                                "{{baseUrl}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "Blog"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "2. Create Post",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "pm.test(\"Status code is 200\", function () {",
+                                                      "    pm.response.to.have.status(200);",
+                                                      "});",
+                                                      "",
+                                                      "pm.test(\"Success message returned\", function () {",
+                                                      "    var jsonData = pm.response.json();",
+                                                      "    pm.expect(jsonData.message).to.eql(\"Create post successfull.\");",
+                                                      "});"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "auth": {
+                                          "type": "bearer",
+                                          "bearer": [
+                                                {
+                                                      "key": "token",
+                                                      "value": "{{token}}",
+                                                      "type": "string"
+                                                }
+                                          ]
+                                    },
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\r\n    \"title\": \"My First English Learning Blog Post\",\r\n    \"content\": \"Today I learned some new vocabulary and I want to share it with everyone. This platform is amazing!\"\r\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{baseUrl}}/api/Blog",
+                                          "host": [
+                                                "{{baseUrl}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "Blog"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "3. Update Post",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "pm.test(\"Status code is 200\", function () {",
+                                                      "    pm.response.to.have.status(200);",
+                                                      "});"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "auth": {
+                                          "type": "bearer",
+                                          "bearer": [
+                                                {
+                                                      "key": "token",
+                                                      "value": "{{token}}",
+                                                      "type": "string"
+                                                }
+                                          ]
+                                    },
+                                    "method": "PUT",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "{\r\n    \"title\": \"Updated: My First English Learning Blog Post\",\r\n    \"content\": \"Updating my post with more details about my learning journey.\"\r\n}"
+                                    },
+                                    "url": {
+                                          "raw": "{{baseUrl}}/api/Blog/{{post_id}}",
+                                          "host": [
+                                                "{{baseUrl}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "Blog",
+                                                "{{post_id}}"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "4. Toggle Like on Post",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "pm.test(\"Status code is 200\", function () {",
+                                                      "    pm.response.to.have.status(200);",
+                                                      "});"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "auth": {
+                                          "type": "bearer",
+                                          "bearer": [
+                                                {
+                                                      "key": "token",
+                                                      "value": "{{token}}",
+                                                      "type": "string"
+                                                }
+                                          ]
+                                    },
+                                    "method": "POST",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{baseUrl}}/api/Blog/{{post_id}}/like",
+                                          "host": [
+                                                "{{baseUrl}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "Blog",
+                                                "{{post_id}}",
+                                                "like"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "5. Add Comment to Post",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "pm.test(\"Status code is 200\", function () {",
+                                                      "    pm.response.to.have.status(200);",
+                                                      "});"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "auth": {
+                                          "type": "bearer",
+                                          "bearer": [
+                                                {
+                                                      "key": "token",
+                                                      "value": "{{token}}",
+                                                      "type": "string"
+                                                }
+                                          ]
+                                    },
+                                    "method": "POST",
+                                    "header": [
+                                          {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                          }
+                                    ],
+                                    "body": {
+                                          "mode": "raw",
+                                          "raw": "\"This is a great post! Thanks for sharing your vocabulary.\""
+                                    },
+                                    "url": {
+                                          "raw": "{{baseUrl}}/api/Blog/{{post_id}}/comment",
+                                          "host": [
+                                                "{{baseUrl}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "Blog",
+                                                "{{post_id}}",
+                                                "comment"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        },
+                        {
+                              "name": "6. Delete Post",
+                              "event": [
+                                    {
+                                          "listen": "test",
+                                          "script": {
+                                                "exec": [
+                                                      "pm.test(\"Status code is 200 or 400\", function () {",
+                                                      "    pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+                                                      "});"
+                                                ],
+                                                "type": "text/javascript"
+                                          }
+                                    }
+                              ],
+                              "request": {
+                                    "auth": {
+                                          "type": "bearer",
+                                          "bearer": [
+                                                {
+                                                      "key": "token",
+                                                      "value": "{{token}}",
+                                                      "type": "string"
+                                                }
+                                          ]
+                                    },
+                                    "method": "DELETE",
+                                    "header": [],
+                                    "url": {
+                                          "raw": "{{baseUrl}}/api/Blog/{{post_id}}",
+                                          "host": [
+                                                "{{baseUrl}}"
+                                          ],
+                                          "path": [
+                                                "api",
+                                                "Blog",
+                                                "{{post_id}}"
+                                          ]
+                                    }
+                              },
+                              "response": []
+                        }
+                  ]
+            }
+      ],
+      "variable": [
+            {
+                  "key": "baseUrl",
+                  "value": "https://localhost:7083",
+                  "type": "string"
+            },
+            {
+                  "key": "token",
+                  "value": "YOUR_BEARER_TOKEN_HERE",
+                  "type": "string"
+            },
+            {
+                  "key": "post_id",
+                  "value": "REPLACE_WITH_POST_GUID",
+                  "type": "string"
+            }
+      ]
+}
