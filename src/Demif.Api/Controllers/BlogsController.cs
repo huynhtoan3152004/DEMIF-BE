@@ -55,7 +55,7 @@ namespace Demif.Api.Controllers
 
         [HttpPost]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> CreateBlog([FromBody] CreateBlogRequest request)
+        public async Task<IActionResult> CreateBlog([FromForm] CreateBlogRequest request)
         {
             try
             {
@@ -70,7 +70,7 @@ namespace Demif.Api.Controllers
 
         [HttpPut("{id:guid}")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> UpdateBlog(Guid id, [FromBody] UpdateBlogRequest request)
+        public async Task<IActionResult> UpdateBlog(Guid id, [FromForm] UpdateBlogRequest request)
         {
             var isSuccess = await _updateBlogService.ExecuteAsync(id, request);
             if (!isSuccess) return NotFound(new { message = "Không tìm thấy bài viết để cập nhật" });

@@ -6,32 +6,40 @@ using Demif.Domain.Entities;
 
 namespace Demif.Application.Features.Blogs.CreateBlog
 {
-    // Đã thêm public
     public interface ICreateBlogService
     {
         Task<Guid> ExecuteAsync(CreateBlogRequest request);
     }
 
-    // Đã thêm public
     public class CreateBlogService : ICreateBlogService
     {
         private readonly IBlogRepository _blogRepository;
         private readonly ICurrentUserService _currentUserService;
+        private readonly IImageUploadService _imageUploadService;
 
-        public CreateBlogService(IBlogRepository blogRepository, ICurrentUserService currentUserService)
+        public CreateBlogService(
+            IBlogRepository blogRepository,
+            ICurrentUserService currentUserService,
+            IImageUploadService imageUploadService)
         {
             _blogRepository = blogRepository;
             _currentUserService = currentUserService;
+            _imageUploadService = imageUploadService;
         }
 
         public async Task<Guid> ExecuteAsync(CreateBlogRequest request)
         {
-            // Lấy ID của Admin đang đăng nhập (từ JWT Token)
             var adminId = _currentUserService.UserId;
-
-            if (adminId == Guid.Empty)
+            if (adminId == null || adminId == Guid.Empty)
             {
                 throw new Exception("Không xác định được danh tính Admin.");
+            }
+
+            // Gọi Cloudinary upload ảnh
+            string? uploadedImageUrl = null;
+            if (request.ThumbnailFile != null)
+            {
+                uploadedImageUrl = await _imageUploadService.UploadImageAsync(request.ThumbnailFile, "demif-blogs");
             }
 
             var blog = new Blog
@@ -40,7 +48,7 @@ namespace Demif.Application.Features.Blogs.CreateBlog
                 Title = request.Title,
                 Content = request.Content,
                 Summary = request.Summary,
-                ThumbnailUrl = request.ThumbnailUrl,
+                ThumbnailUrl = uploadedImageUrl, // Gán URL lấy từ Cloudinary
                 Tags = request.Tags,
                 Status = request.Status ?? "published",
                 AuthorId = adminId.Value,
@@ -49,7 +57,6 @@ namespace Demif.Application.Features.Blogs.CreateBlog
             };
 
             await _blogRepository.AddAsync(blog);
-
             return blog.Id;
         }
     }

@@ -49,6 +49,7 @@ public static class DependencyInjection
         services.AddSingleton<IFirebaseAuthService, FirebaseAuthService>();
         services.AddSingleton<IFirebaseStorageService, FirebaseStorageService>();
         services.AddScoped<ICreateBlogService, CreateBlogService>();
+        services.AddScoped<IImageUploadService, CloudinaryImageUploadService>();
 
         // Lesson upload service
         services.AddScoped<UploadLessonAudioService>();
