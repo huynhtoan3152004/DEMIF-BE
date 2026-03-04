@@ -74,6 +74,7 @@ public class GetDictationExerciseService
             Title = lesson.Title,
             Description = lesson.Description,
             AudioUrl = lesson.MediaUrl ?? lesson.AudioUrl,
+            MediaType = lesson.MediaType,
             DurationSeconds = lesson.DurationSeconds,
             Level = level.ToString(),
             Template = template,
@@ -109,6 +110,16 @@ public class DictationExerciseResponse
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string AudioUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// "audio" | "video" | "youtube"
+    /// Frontend dùng field này để render đúng player:
+    /// - "youtube" → iframe embed YouTube player
+    /// - "audio" → HTML5 audio player
+    /// - "video" → HTML5 video player
+    /// </summary>
+    public string? MediaType { get; set; }
+
     public int DurationSeconds { get; set; }
     public string Level { get; set; } = string.Empty;
     public DictationTemplate Template { get; set; } = null!;

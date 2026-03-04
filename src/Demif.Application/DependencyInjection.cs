@@ -77,6 +77,7 @@ public static class DependencyInjection
         services.AddScoped<GetDictationExerciseService>();
         services.AddScoped<SubmitDictationService>();
         services.AddScoped<AdminLessonService>();
+        services.AddScoped<YouTubeLessonService>();
 
         // Payment Services
         services.AddScoped<SePayWebhookService>();

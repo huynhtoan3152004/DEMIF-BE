@@ -1,0 +1,810 @@
+{
+  "info": {
+    "name": "DEMIF - YouTube & Dictation APIs",
+    "_postman_id": "demif-youtube-dictation-v1",
+    "description": "Test toàn bộ luồng YouTube Integration + Dictation Exercise:\n\n## Flow chuẩn:\n1. **0. Auth** → Login lấy `admin_token` và `user_token`\n2. **1. YouTube Preview** → Kiểm tra video có captions không\n3. **2. Create Lesson from YouTube** → Tạo lesson, auto-set `lesson_id`\n4. **3. Manage Lesson** → Publish, regenerate templates, upload audio\n5. **4. Dictation Exercise** → User lấy exercise + submit bài\n\n## Variables:\n- `base_url`: http://localhost:5077\n- `admin_token`: JWT token admin (auto-set sau login)\n- `user_token`: JWT token user (auto-set sau login)\n- `lesson_id`: ID lesson tạo từ YouTube (auto-set)\n- `youtube_url`: URL video YouTube để test",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5077",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "lesson_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "youtube_url",
+      "value": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Auth - Lấy Token",
+      "item": [
+        {
+          "name": "Login Admin → auto save token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    var token = json.accessToken || json.token || (json.data && json.data.accessToken);",
+                  "    pm.collectionVariables.set('admin_token', token);",
+                  "    console.log('✅ Admin token saved:', token.substring(0, 30) + '...');",
+                  "} else {",
+                  "    console.error('❌ Login failed:', pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@demif.com\",\n  \"password\": \"Admin@123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Đăng nhập admin. Token tự động lưu vào `admin_token`."
+          },
+          "response": []
+        },
+        {
+          "name": "Login User → auto save token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    var token = json.accessToken || json.token || (json.data && json.data.accessToken);",
+                  "    pm.collectionVariables.set('user_token', token);",
+                  "    console.log('✅ User token saved');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@demif.com\",\n  \"password\": \"User@123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Đăng nhập user thường. Token lưu vào `user_token`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. YouTube - Preview Video",
+      "item": [
+        {
+          "name": "Preview YouTube Video (có captions)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "pm.test('HasCaptions field exists', () => pm.expect(json).to.have.property('hasCaptions'));",
+                  "pm.test('VideoId exists', () => pm.expect(json).to.have.property('videoId'));",
+                  "if (json.hasCaptions) {",
+                  "    console.log('✅ Video có captions - sẵn sàng tạo lesson!');",
+                  "} else {",
+                  "    console.warn('⚠️ Video KHÔNG có captions - sẽ dùng description thay thế');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/youtube/preview?url={{youtube_url}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "youtube", "preview"],
+              "query": [
+                {
+                  "key": "url",
+                  "value": "{{youtube_url}}",
+                  "description": "YouTube URL (watch?v=, youtu.be/, hoặc embed/)"
+                }
+              ]
+            },
+            "description": "Xem preview video YouTube: title, duration, thumbnail, và quan trọng nhất là `hasCaptions`. Không tạo gì cả."
+          },
+          "response": []
+        },
+        {
+          "name": "Preview - BBC News English (có captions)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "console.log('Title:', json.title);",
+                  "console.log('Duration:', json.durationSeconds, 's');",
+                  "console.log('Has captions:', json.hasCaptions);",
+                  "console.log('Available captions:', JSON.stringify(json.availableCaptionLanguages));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/youtube/preview?url=https://www.youtube.com/watch?v=BmkZLJOEGF0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "youtube", "preview"],
+              "query": [
+                {
+                  "key": "url",
+                  "value": "https://www.youtube.com/watch?v=BmkZLJOEGF0",
+                  "description": "BBC News clip - thường có captions"
+                }
+              ]
+            },
+            "description": "Test với BBC News clip mẫu - video tin tức thường có captions tiếng Anh."
+          },
+          "response": []
+        },
+        {
+          "name": "Preview - Invalid URL (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should return 400 for invalid URL', () => pm.response.to.have.status(400));",
+                  "console.log('✅ Error handling OK:', pm.response.json().error);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/youtube/preview?url=https://notyoutube.com/video",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "youtube", "preview"],
+              "query": [
+                { "key": "url", "value": "https://notyoutube.com/video" }
+              ]
+            },
+            "description": "Test error handling với URL không phải YouTube."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. YouTube - Tạo Lesson",
+      "item": [
+        {
+          "name": "Create Lesson from YouTube (Beginner, free)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "var json = pm.response.json();",
+                  "if (json.lessonId) {",
+                  "    pm.collectionVariables.set('lesson_id', json.lessonId);",
+                  "    console.log('✅ Lesson created! ID:', json.lessonId);",
+                  "    console.log('Title:', json.title);",
+                  "    console.log('Has captions:', json.hasCaptions);",
+                  "    console.log('Dictation templates:', json.hasDictationTemplates);",
+                  "    console.log('Embed URL:', json.embedUrl);",
+                  "} else {",
+                  "    console.error('❌ No lessonId in response:', JSON.stringify(json));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"youTubeUrl\": \"{{youtube_url}}\",\n  \"captionLanguage\": \"en\",\n  \"lessonType\": 0,\n  \"level\": 0,\n  \"category\": \"entertainment\",\n  \"isPremiumOnly\": false,\n  \"displayOrder\": 1,\n  \"tags\": \"[\\\"english\\\", \\\"beginner\\\"]\",\n  \"status\": \"draft\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/from-youtube",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "from-youtube"]
+            },
+            "description": "Tạo lesson từ YouTube URL. Backend tự động:\n- Fetch title, description, thumbnail từ YouTube API\n- Tải captions (nếu có) → làm FullTranscript\n- Generate DictationTemplates cho 4 levels (Beginner, Elementary, Intermediate, Advanced)\n\n`lesson_id` tự động lưu vào collection variable."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Lesson from YouTube (Premium, Business English)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "var json = pm.response.json();",
+                  "if (json.lessonId) {",
+                  "    pm.collectionVariables.set('lesson_id_premium', json.lessonId);",
+                  "    console.log('✅ Premium lesson created! ID:', json.lessonId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"youTubeUrl\": \"https://www.youtube.com/watch?v=BmkZLJOEGF0\",\n  \"captionLanguage\": \"en\",\n  \"lessonType\": 0,\n  \"level\": 2,\n  \"category\": \"business\",\n  \"isPremiumOnly\": true,\n  \"displayOrder\": 10,\n  \"tags\": \"[\\\"business\\\", \\\"intermediate\\\", \\\"bbc\\\"]\",\n  \"status\": \"draft\",\n  \"titleOverride\": \"BBC Business English - Listening Practice\",\n  \"descriptionOverride\": \"Luyện nghe tiếng Anh thương mại với BBC News\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/from-youtube",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "from-youtube"]
+            },
+            "description": "Tạo lesson Premium với title/description override. Level 2 = Intermediate."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Lesson - Missing URL (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should return 400', () => pm.response.to.have.status(400));",
+                  "console.log('Error:', pm.response.json().error);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"youTubeUrl\": \"\",\n  \"captionLanguage\": \"en\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/from-youtube",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "from-youtube"]
+            },
+            "description": "Test validation: URL rỗng phải trả về 400."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Admin - Quản Lý Lesson",
+      "item": [
+        {
+          "name": "Get All Lessons (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "console.log('Total lessons:', json.totalCount || json.data?.length);",
+                  "// Auto-set lesson_id nếu chưa có",
+                  "if (!pm.collectionVariables.get('lesson_id') && json.items && json.items.length > 0) {",
+                  "    pm.collectionVariables.set('lesson_id', json.items[0].id);",
+                  "    console.log('Auto-set lesson_id:', json.items[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons?page=1&pageSize=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" },
+                { "key": "status", "value": "", "disabled": true }
+              ]
+            },
+            "description": "Lấy tất cả lessons cho admin (kể cả draft, archived). Auto-set lesson_id nếu collection variable chưa có."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Lesson Detail (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "console.log('Lesson:', json.title);",
+                  "console.log('Status:', json.status);",
+                  "console.log('Has DictationTemplates:', !!json.dictationTemplates);",
+                  "console.log('DictationTemplates snippet:', JSON.stringify(json.dictationTemplates)?.substring(0, 200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "{{lesson_id}}"]
+            },
+            "description": "Xem chi tiết lesson, bao gồm FullTranscript và DictationTemplates JSON."
+          },
+          "response": []
+        },
+        {
+          "name": "Publish Lesson (Draft → Published)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 No Content', () => pm.response.to.have.status(204));",
+                  "console.log('✅ Lesson published!');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"published\",\n  \"isPremiumOnly\": false,\n  \"displayOrder\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "{{lesson_id}}"]
+            },
+            "description": "Publish lesson để user thấy. Chỉ cần đổi `status` từ `draft` → `published`."
+          },
+          "response": []
+        },
+        {
+          "name": "Regenerate Dictation Templates",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "console.log('✅ Templates regenerated:', pm.response.json().message);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}/regenerate-templates",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api", "admin", "lessons", "{{lesson_id}}", "regenerate-templates"
+              ]
+            },
+            "description": "Re-generate DictationTemplates từ FullTranscript. Dùng khi muốn refresh blanks mà không edit lesson."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Lesson (Soft Delete)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));",
+                  "console.log('✅ Lesson archived (soft deleted)');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "{{lesson_id}}"]
+            },
+            "description": "Soft delete lesson (chuyển sang status `archived`). Không xóa hẳn."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Dictation Exercise - User Flow",
+      "item": [
+        {
+          "name": "Get Published Lessons (User - không cần auth)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "var items = json.items || json.data || json;",
+                  "if (Array.isArray(items) && items.length > 0) {",
+                  "    pm.collectionVariables.set('lesson_id', items[0].id);",
+                  "    console.log('✅ Found', items.length, 'lessons. First:', items[0].title);",
+                  "} else {",
+                  "    console.warn('⚠️ No published lessons yet. Publish one first!');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/lessons?page=1&pageSize=10&lessonType=Dictation",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lessons"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "10" },
+                { "key": "lessonType", "value": "Dictation" },
+                { "key": "level", "value": "Beginner", "disabled": true },
+                { "key": "category", "value": "", "disabled": true }
+              ]
+            },
+            "description": "User lấy danh sách bài học (public). Auto-set `lesson_id` từ bài đầu tiên."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Dictation Exercise - Beginner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "pm.test('Has segments', () => pm.expect(json.segments || json).to.be.an('array').and.not.empty);",
+                  "var segments = json.segments || json;",
+                  "console.log('Total segments:', segments.length);",
+                  "console.log('First segment blanks:', segments[0]?.blanks?.length, 'blanks');",
+                  "console.log('First segment text snippet (with ___):');",
+                  "console.log(segments[0]?.displayText?.substring(0, 200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation?level=Beginner",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lessons", "{{lesson_id}}", "dictation"],
+              "query": [
+                {
+                  "key": "level",
+                  "value": "Beginner",
+                  "description": "Beginner | Elementary | Intermediate | Advanced"
+                }
+              ]
+            },
+            "description": "Lấy bài dictation level Beginner. Response chứa segments với blanks (___) - KHÔNG có đáp án."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Dictation Exercise - Advanced",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "var segments = json.segments || json;",
+                  "console.log('Advanced - Total blanks in first segment:', segments[0]?.blanks?.length);",
+                  "// Advanced nên có nhiều blanks hơn Beginner",
+                  "console.log('Advanced should have MORE blanks than Beginner');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation?level=Advanced",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lessons", "{{lesson_id}}", "dictation"],
+              "query": [
+                { "key": "level", "value": "Advanced" }
+              ]
+            },
+            "description": "Test level Advanced - nhiều blanks hơn Beginner."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Dictation - Điểm Cao (correct answers)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "console.log('✅ Score:', json.score, '%');",
+                  "console.log('Correct:', json.correctCount, '/', json.totalCount);",
+                  "console.log('Passed:', json.isPassed);",
+                  "if (json.wordResults) {",
+                  "    var wrong = json.wordResults.filter(w => !w.isCorrect);",
+                  "    console.log('Wrong words:', wrong.map(w => w.expected + ' ≠ ' + w.submitted).join(', '));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{user_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"level\": \"Beginner\",\n  \"answers\": [\n    {\n      \"segmentIndex\": 0,\n      \"blankIndex\": 0,\n      \"answer\": \"the\"\n    },\n    {\n      \"segmentIndex\": 0,\n      \"blankIndex\": 1,\n      \"answer\": \"word\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation/submit",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api", "lessons", "{{lesson_id}}", "dictation", "submit"
+              ]
+            },
+            "description": "Submit đáp án dictation. Response trả về score (%), correct/total counts, và từng word result."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Dictation - Không Auth (expect 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should return 401', () => pm.response.to.have.status(401));",
+                  "console.log('✅ Auth required for submit - correct!');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"level\": \"Beginner\",\n  \"answers\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation/submit",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api", "lessons", "{{lesson_id}}", "dictation", "submit"
+              ]
+            },
+            "description": "Submit không có token phải trả về 401."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Edge Cases & Stress Tests",
+      "item": [
+        {
+          "name": "Preview - youtu.be Short URL",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/youtube/preview?url=https://youtu.be/dQw4w9WgXcQ",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "youtube", "preview"],
+              "query": [
+                { "key": "url", "value": "https://youtu.be/dQw4w9WgXcQ" }
+              ]
+            },
+            "description": "Test short URL format youtu.be - backend phải tự parse Video ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Preview - Embed URL Format",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/youtube/preview?url=https://www.youtube.com/embed/dQw4w9WgXcQ",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "youtube", "preview"],
+              "query": [
+                { "key": "url", "value": "https://www.youtube.com/embed/dQw4w9WgXcQ" }
+              ]
+            },
+            "description": "Test embed URL format."
+          },
+          "response": []
+        },
+        {
+          "name": "Preview - Raw Video ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/youtube/preview?url=dQw4w9WgXcQ",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "youtube", "preview"],
+              "query": [
+                { "key": "url", "value": "dQw4w9WgXcQ", "description": "Video ID thuần" }
+              ]
+            },
+            "description": "Test passing raw Video ID. Backend có thể hỗ trợ hoặc không."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Lesson - Unauthorized User (expect 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should return 401 or 403', () => pm.expect([401, 403]).to.include(pm.response.code));",
+                  "console.log('✅ Non-admin cannot create lesson - correct!');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{user_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"youTubeUrl\": \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/from-youtube",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "from-youtube"]
+            },
+            "description": "User thường không có quyền tạo lesson - phải trả về 403."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

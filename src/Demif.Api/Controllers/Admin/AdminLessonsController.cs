@@ -14,14 +14,14 @@ namespace Demif.Api.Controllers.Admin;
 public class AdminLessonsController : ControllerBase
 {
     private readonly AdminLessonService _adminService;
-    private readonly UploadLessonAudioService _uploadService;
+    private readonly YouTubeLessonService _youTubeService;
 
     public AdminLessonsController(
         AdminLessonService adminService,
-        UploadLessonAudioService uploadService)
+        YouTubeLessonService youTubeService)
     {
         _adminService = adminService;
-        _uploadService = uploadService;
+        _youTubeService = youTubeService;
     }
 
     /// <summary>
@@ -146,40 +146,46 @@ public class AdminLessonsController : ControllerBase
         return Ok(new { message = "DictationTemplates regenerated successfully." });
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // YouTube Integration Endpoints
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Upload file MP3 lên Firebase Storage và gắn URL vào lesson.
-    /// POST /api/admin/lessons/{id}/upload-audio
-    /// Content-Type: multipart/form-data
-    /// Body: file (IFormFile)
+    /// Preview YouTube video trước khi tạo lesson.
+    /// Admin xem metadata, kiểm tra captions có sẵn không.
+    /// GET /api/admin/lessons/youtube/preview?url=https://youtube.com/watch?v=abc123
     /// </summary>
-    [HttpPost("{id:guid}/upload-audio")]
-    [RequestSizeLimit(52_428_800)] // 50MB
-    public async Task<IActionResult> UploadAudio(
-        Guid id,
-        IFormFile file,
+    [HttpGet("youtube/preview")]
+    public async Task<IActionResult> YouTubePreview(
+        [FromQuery] string url,
         CancellationToken cancellationToken)
     {
-        if (file == null || file.Length == 0)
-            return BadRequest(new { error = "Vui lòng chọn file âm thanh." });
-
-        await using var stream = file.OpenReadStream();
-
-        var result = await _uploadService.ExecuteAsync(
-            id,
-            stream,
-            file.FileName,
-            file.ContentType,
-            cancellationToken);
+        var result = await _youTubeService.PreviewAsync(url, cancellationToken);
 
         if (result.IsFailure)
-        {
-            return result.Error.Code switch
-            {
-                "NotFound" => NotFound(new { error = result.Error.Message }),
-                _ => BadRequest(new { error = result.Error.Message })
-            };
-        }
+            return BadRequest(new { error = result.Error.Message });
 
         return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Tạo lesson từ YouTube URL.
+    /// Auto-fetch metadata + captions → generate DictationTemplates cho 4 levels.
+    /// POST /api/admin/lessons/from-youtube
+    /// </summary>
+    [HttpPost("from-youtube")]
+    public async Task<IActionResult> CreateFromYouTube(
+        [FromBody] CreateLessonFromYouTubeRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _youTubeService.CreateFromYouTubeAsync(request, cancellationToken);
+
+        if (result.IsFailure)
+            return BadRequest(new { error = result.Error.Message });
+
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = result.Value.LessonId },
+            result.Value);
     }
 }
