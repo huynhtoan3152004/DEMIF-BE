@@ -27,10 +27,17 @@ public class AdminLessonServiceTests
         _dbContextMock = new Mock<IApplicationDbContext>();
         _loggerMock = new Mock<ILogger<AdminLessonService>>();
         _validatorMock = new Mock<IValidator<CreateUpdateLessonRequest>>();
-        // Default: validator always passes
-        _validatorMock.Setup(v => v.ValidateAsync(It.IsAny<CreateUpdateLessonRequest>(), It.IsAny<CancellationToken>()))
+
+        // Default: validation always passes
+        _validatorMock
+            .Setup(v => v.ValidateAsync(It.IsAny<CreateUpdateLessonRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ValidationResult());
-        _service = new AdminLessonService(_lessonRepoMock.Object, _dbContextMock.Object, _loggerMock.Object, _validatorMock.Object);
+
+        _service = new AdminLessonService(
+            _lessonRepoMock.Object,
+            _dbContextMock.Object,
+            _loggerMock.Object,
+            _validatorMock.Object);
     }
 
     private static CreateUpdateLessonRequest CreateValidRequest()

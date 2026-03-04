@@ -15,13 +15,16 @@ public class AdminLessonsController : ControllerBase
 {
     private readonly AdminLessonService _adminService;
     private readonly YouTubeLessonService _youTubeService;
+    private readonly AdminTranscriptService _transcriptService;
 
     public AdminLessonsController(
         AdminLessonService adminService,
-        YouTubeLessonService youTubeService)
+        YouTubeLessonService youTubeService,
+        AdminTranscriptService transcriptService)
     {
         _adminService = adminService;
         _youTubeService = youTubeService;
+        _transcriptService = transcriptService;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -189,5 +192,73 @@ public class AdminLessonsController : ControllerBase
             nameof(GetById),
             new { id = result.Value.LessonId },
             result.Value);
+    }
+
+    /// <summary>
+    /// Admin xem toàn bộ segments + đáp án (chưa xóa answers).
+    /// Kiểm tra tất cả segment có đúng với transcript chưa trước khi publish.
+    /// GET /api/admin/lessons/{id}/dictation-preview
+    /// </summary>
+    [HttpGet("{id:guid}/dictation-preview")]
+    public async Task<IActionResult> GetDictationPreview(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _transcriptService.GetDictationPreviewAsync(id, cancellationToken);
+
+        if (result.IsFailure)
+            return result.Error.Code switch
+            {
+                "NotFound" => NotFound(new { error = result.Error.Message }),
+                _ => BadRequest(new { error = result.Error.Message })
+            };
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Upload / cập nhật transcript thủ công — hỗ trợ VTT, SRT, hoặc plain text.
+    /// Dùng khi video không có caption hoặc caption YouTube bị sai chính tả.
+    /// PATCH /api/admin/lessons/{id}/transcript
+    /// </summary>
+    [HttpPatch("{id:guid}/transcript")]
+    public async Task<IActionResult> UpdateTranscript(
+        Guid id,
+        [FromBody] UpdateTranscriptRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _transcriptService.UpdateTranscriptAsync(id, request, cancellationToken);
+
+        if (result.IsFailure)
+            return result.Error.Code switch
+            {
+                "NotFound"   => NotFound(new { error = result.Error.Message }),
+                "Validation" => BadRequest(new { error = result.Error.Message }),
+                _            => BadRequest(new { error = result.Error.Message })
+            };
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Thay đổi trạng thái: draft → published → archived.
+    /// Guard: không publish được nếu chưa có TimedTranscript.
+    /// PATCH /api/admin/lessons/{id}/status
+    /// </summary>
+    [HttpPatch("{id:guid}/status")]
+    public async Task<IActionResult> UpdateStatus(
+        Guid id,
+        [FromBody] UpdateLessonStatusRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _transcriptService.UpdateStatusAsync(id, request, cancellationToken);
+
+        if (result.IsFailure)
+            return result.Error.Code switch
+            {
+                "NotFound"   => NotFound(new { error = result.Error.Message }),
+                "Validation" => BadRequest(new { error = result.Error.Message }),
+                _            => BadRequest(new { error = result.Error.Message })
+            };
+
+        return Ok(result.Value);
     }
 }

@@ -6,8 +6,10 @@ using Demif.Application.Features.Auth.VerifyEmail;
 using Demif.Application.Features.Auth.RefreshToken;
 using Demif.Application.Features.Auth.Register;
 using Demif.Application.Features.Lessons.Admin;
+using Demif.Application.Features.Lessons.CheckSegment;
 using Demif.Application.Features.Lessons.GetDictationExercise;
 using Demif.Application.Features.Lessons.GetLessonById;
+using Demif.Application.Features.Lessons.GetLessonSegments;
 using Demif.Application.Features.Lessons.SubmitDictation;
 using Demif.Application.Features.Lessons.GetLessons;
 using Demif.Application.Features.Payments.Webhook;
@@ -83,6 +85,9 @@ public static class DependencyInjection
         services.AddScoped<SubmitDictationService>();
         services.AddScoped<AdminLessonService>();
         services.AddScoped<YouTubeLessonService>();
+        services.AddScoped<GetLessonSegmentsService>();
+        services.AddScoped<CheckSegmentService>();
+        services.AddScoped<AdminTranscriptService>();
 
         // Payment Services
         services.AddScoped<SePayWebhookService>();
