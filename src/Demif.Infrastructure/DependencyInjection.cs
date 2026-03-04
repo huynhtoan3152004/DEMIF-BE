@@ -37,6 +37,7 @@ public static class DependencyInjection
         services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
         services.AddScoped<IUserSubscriptionRepository, UserSubscriptionRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddScoped<IBlogRepository, BlogRepository>();
 
         // Services
         services.AddScoped<IJwtTokenService, JwtTokenService>();
@@ -45,6 +46,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddSingleton<IGoogleAuthService, GoogleAuthService>();
         services.AddScoped<IEmailService, SmtpEmailService>();
+        services.AddScoped<IImageUploadService, CloudinaryImageUploadService>();
 
         // YouTube service (HttpClient with timeout)
         services.AddHttpClient<IYouTubeService, YouTubeService>(client =>
