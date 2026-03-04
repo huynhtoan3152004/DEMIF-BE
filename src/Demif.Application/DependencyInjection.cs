@@ -1,7 +1,8 @@
 using Demif.Application.Features.Auth.ChangePassword;
 using Demif.Application.Features.Auth.Login;
 using Demif.Application.Features.Auth.Logout;
-using Demif.Application.Features.Auth.FirebaseLogin;
+using Demif.Application.Features.Auth.GoogleLogin;
+using Demif.Application.Features.Auth.VerifyEmail;
 using Demif.Application.Features.Auth.RefreshToken;
 using Demif.Application.Features.Auth.Register;
 using Demif.Application.Features.Lessons.Admin;
@@ -47,7 +48,8 @@ public static class DependencyInjection
 
         // Auth Services
         services.AddScoped<LoginService>();
-        services.AddScoped<FirebaseLoginService>();
+        services.AddScoped<GoogleLoginService>();
+        services.AddScoped<VerifyEmailService>();
         services.AddScoped<RegisterService>();
         services.AddScoped<RefreshTokenService>();
         services.AddScoped<LogoutService>();
@@ -80,6 +82,7 @@ public static class DependencyInjection
         services.AddScoped<GetDictationExerciseService>();
         services.AddScoped<SubmitDictationService>();
         services.AddScoped<AdminLessonService>();
+        services.AddScoped<YouTubeLessonService>();
 
         // Payment Services
         services.AddScoped<SePayWebhookService>();

@@ -8,11 +8,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace Demif.Api.Controllers;
 
 /// <summary>
-/// Profile Controller - API cho user xem/cập nhật profile của mình
-/// Yêu cầu đăng nhập (any authenticated user)
+/// Profile — View and update the authenticated user's profile
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/profile")]
 [Authorize]
 public class ProfileController : ControllerBase
 {
@@ -33,8 +32,12 @@ public class ProfileController : ControllerBase
         _currentUserService = currentUserService;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Profile CRUD
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Lấy profile của user hiện tại
+    /// Get current user's profile.
     /// </summary>
     [HttpGet("me")]
     [ProducesResponseType(typeof(GetMyProfileResponse), 200)]
@@ -59,7 +62,7 @@ public class ProfileController : ControllerBase
     }
 
     /// <summary>
-    /// Cập nhật profile của user hiện tại
+    /// Update current user's profile.
     /// </summary>
     [HttpPut("me")]
     [ProducesResponseType(200)]
@@ -89,8 +92,12 @@ public class ProfileController : ControllerBase
         return Ok(new { message = "Profile updated successfully" });
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Security
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Đổi mật khẩu
+    /// Change password.
     /// </summary>
     [HttpPost("change-password")]
     [ProducesResponseType(200)]

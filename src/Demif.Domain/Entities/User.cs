@@ -21,9 +21,15 @@ public class User : AuditableEntity
     public Level CurrentLevel { get; set; } = Level.Beginner;
     public int DailyGoalMinutes { get; set; } = 30;
 
-    // Firebase Auth Integration
-    public string? FirebaseUid { get; set; }
-    public string AuthProvider { get; set; } = "email";
+    // OAuth Integration
+    public string? GoogleId { get; set; }       // Google sub (thay FirebaseUid)
+    public string? FirebaseUid { get; set; }    // Legacy — giữ để backward compat
+    public string AuthProvider { get; set; } = "email"; // email | google
+
+    // Email Verification
+    public bool IsEmailVerified { get; set; } = false;
+    public string? EmailVerificationToken { get; set; }
+    public DateTime? EmailVerificationExpiry { get; set; }
 
     // Settings (JSON)
     public string? Settings { get; set; }

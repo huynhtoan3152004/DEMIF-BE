@@ -68,12 +68,20 @@ public class GetDictationExerciseService
         // ⚠️ QUAN TRỌNG: Xóa Answer khỏi response để user không cheat
         StripAnswers(template);
 
+        var mediaUrl = lesson.MediaUrl ?? lesson.AudioUrl;
+        var mediaType = lesson.MediaType ?? "audio";
+        var isYouTube = string.Equals(mediaType, "youtube", StringComparison.OrdinalIgnoreCase);
+
         return Result.Success(new DictationExerciseResponse
         {
             LessonId = lesson.Id,
             Title = lesson.Title,
             Description = lesson.Description,
-            AudioUrl = lesson.MediaUrl ?? lesson.AudioUrl,
+            MediaUrl = mediaUrl,
+            AudioUrl = lesson.AudioUrl,
+            MediaType = mediaType,
+            VideoId = isYouTube ? ExtractYouTubeVideoId(mediaUrl) : null,
+            EmbedUrl = isYouTube ? mediaUrl : null,
             DurationSeconds = lesson.DurationSeconds,
             Level = level.ToString(),
             Template = template,
@@ -98,17 +106,55 @@ public class GetDictationExerciseService
             }
         }
     }
+
+    /// <summary>
+    /// Extract YouTube video ID from embed URL (https://www.youtube.com/embed/{videoId}).
+    /// </summary>
+    private static string? ExtractYouTubeVideoId(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+        var match = System.Text.RegularExpressions.Regex.Match(url, @"(?:embed|v|vi)[/=]([a-zA-Z0-9_-]{11})");
+        return match.Success ? match.Groups[1].Value : null;
+    }
 }
 
 /// <summary>
-/// Response cho dictation exercise
+/// Dictation exercise response with media info and blanked template.
+/// MediaType determines the content source: "audio" (MP3) or "youtube" (YouTube embed).
 /// </summary>
 public class DictationExerciseResponse
 {
     public Guid LessonId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public string AudioUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Primary media URL for the exercise player.
+    /// - "audio": direct MP3/audio file URL
+    /// - "youtube": YouTube embed URL
+    /// </summary>
+    public string? MediaUrl { get; set; }
+
+    /// <summary>Legacy audio URL (use MediaUrl instead). Kept for backward compatibility.</summary>
+    public string? AudioUrl { get; set; }
+
+    /// <summary>
+    /// Content type: "audio" | "video" | "youtube".
+    /// Frontend should render the appropriate player based on this value.
+    /// </summary>
+    public string? MediaType { get; set; }
+
+    /// <summary>
+    /// YouTube Video ID (only present when MediaType == "youtube").
+    /// </summary>
+    public string? VideoId { get; set; }
+
+    /// <summary>
+    /// YouTube embed URL (only present when MediaType == "youtube").
+    /// Ready-to-use in an iframe src attribute.
+    /// </summary>
+    public string? EmbedUrl { get; set; }
+
     public int DurationSeconds { get; set; }
     public string Level { get; set; } = string.Empty;
     public DictationTemplate Template { get; set; } = null!;

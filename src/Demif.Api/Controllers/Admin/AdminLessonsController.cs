@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Demif.Api.Controllers.Admin;
 
 /// <summary>
-/// Admin API Controller cho quản lý Lessons
+/// Admin — Lesson Management (CRUD, templates, YouTube import)
 /// </summary>
 [Route("api/admin/lessons")]
 [ApiController]
@@ -14,18 +14,22 @@ namespace Demif.Api.Controllers.Admin;
 public class AdminLessonsController : ControllerBase
 {
     private readonly AdminLessonService _adminService;
-    private readonly UploadLessonAudioService _uploadService;
+    private readonly YouTubeLessonService _youTubeService;
 
     public AdminLessonsController(
         AdminLessonService adminService,
-        UploadLessonAudioService uploadService)
+        YouTubeLessonService youTubeService)
     {
         _adminService = adminService;
-        _uploadService = uploadService;
+        _youTubeService = youTubeService;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Lesson CRUD
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Lấy tất cả lessons với pagination (không filter premium)
+    /// List all lessons with pagination (no premium filter).
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetAll(
@@ -47,7 +51,7 @@ public class AdminLessonsController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy chi tiết lesson
+    /// Get lesson detail.
     /// </summary>
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
@@ -67,7 +71,7 @@ public class AdminLessonsController : ControllerBase
     }
 
     /// <summary>
-    /// Tạo lesson mới (auto-generate DictationTemplates từ FullTranscript)
+    /// Create a new lesson (auto-generates DictationTemplates from FullTranscript).
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> Create(
@@ -83,7 +87,7 @@ public class AdminLessonsController : ControllerBase
     }
 
     /// <summary>
-    /// Cập nhật lesson (re-generate templates nếu transcript thay đổi)
+    /// Update lesson (re-generates templates if transcript changed).
     /// </summary>
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(
@@ -106,7 +110,7 @@ public class AdminLessonsController : ControllerBase
     }
 
     /// <summary>
-    /// Xóa lesson (soft delete - archived)
+    /// Delete lesson (soft delete — archived).
     /// </summary>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
@@ -126,8 +130,8 @@ public class AdminLessonsController : ControllerBase
     }
 
     /// <summary>
-    /// Re-generate DictationTemplates cho lesson hiện có
-    /// Hữu ích khi muốn refresh templates mà không thay đổi lesson data
+    /// Re-generate DictationTemplates for an existing lesson.
+    /// Useful for refreshing templates without changing lesson data.
     /// </summary>
     [HttpPost("{id:guid}/regenerate-templates")]
     public async Task<IActionResult> RegenerateTemplates(Guid id, CancellationToken cancellationToken)
@@ -146,40 +150,44 @@ public class AdminLessonsController : ControllerBase
         return Ok(new { message = "DictationTemplates regenerated successfully." });
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // YouTube Integration Endpoints
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Upload file MP3 lên Firebase Storage và gắn URL vào lesson.
-    /// POST /api/admin/lessons/{id}/upload-audio
-    /// Content-Type: multipart/form-data
-    /// Body: file (IFormFile)
+    /// Preview YouTube video before creating a lesson.
+    /// Check metadata and available captions.
     /// </summary>
-    [HttpPost("{id:guid}/upload-audio")]
-    [RequestSizeLimit(52_428_800)] // 50MB
-    public async Task<IActionResult> UploadAudio(
-        Guid id,
-        IFormFile file,
+    [HttpGet("youtube/preview")]
+    public async Task<IActionResult> YouTubePreview(
+        [FromQuery] string url,
         CancellationToken cancellationToken)
     {
-        if (file == null || file.Length == 0)
-            return BadRequest(new { error = "Vui lòng chọn file âm thanh." });
-
-        await using var stream = file.OpenReadStream();
-
-        var result = await _uploadService.ExecuteAsync(
-            id,
-            stream,
-            file.FileName,
-            file.ContentType,
-            cancellationToken);
+        var result = await _youTubeService.PreviewAsync(url, cancellationToken);
 
         if (result.IsFailure)
-        {
-            return result.Error.Code switch
-            {
-                "NotFound" => NotFound(new { error = result.Error.Message }),
-                _ => BadRequest(new { error = result.Error.Message })
-            };
-        }
+            return BadRequest(new { error = result.Error.Message });
 
         return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Create lesson from YouTube URL.
+    /// Auto-fetches metadata + captions, generates DictationTemplates for 4 levels.
+    /// </summary>
+    [HttpPost("from-youtube")]
+    public async Task<IActionResult> CreateFromYouTube(
+        [FromBody] CreateLessonFromYouTubeRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _youTubeService.CreateFromYouTubeAsync(request, cancellationToken);
+
+        if (result.IsFailure)
+            return BadRequest(new { error = result.Error.Message });
+
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = result.Value.LessonId },
+            result.Value);
     }
 }

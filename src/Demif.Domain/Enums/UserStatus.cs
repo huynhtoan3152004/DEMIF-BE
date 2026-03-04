@@ -5,6 +5,7 @@ namespace Demif.Domain.Enums;
 /// </summary>
 public enum UserStatus
 {
+    Pending = 0,    // Chờ xác nhận email
     Active = 1,
     Inactive = 2,
     Suspended = 3,

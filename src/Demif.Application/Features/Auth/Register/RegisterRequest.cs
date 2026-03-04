@@ -23,9 +23,4 @@ public class RegisterRequest
     [MinLength(3, ErrorMessage = "Username must be at least 3 characters")]
     [MaxLength(50, ErrorMessage = "Username cannot exceed 50 characters")]
     public string Username { get; set; } = string.Empty;
-
-    // Optional profile info
-    public string? Country { get; set; }
-    public string NativeLanguage { get; set; } = "Vietnamese";
-    public string TargetLanguage { get; set; } = "English";
 }

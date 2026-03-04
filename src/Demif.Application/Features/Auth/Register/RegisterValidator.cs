@@ -31,14 +31,5 @@ public class RegisterValidator : AbstractValidator<RegisterRequest>
             .MinimumLength(3).WithMessage("Username must be at least 3 characters")
             .MaximumLength(50).WithMessage("Username cannot exceed 50 characters")
             .Matches("^[a-zA-Z0-9_]+$").WithMessage("Username can only contain letters, numbers, and underscores");
-
-        RuleFor(x => x.NativeLanguage)
-            .MaximumLength(50).WithMessage("Native language cannot exceed 50 characters");
-
-        RuleFor(x => x.TargetLanguage)
-            .MaximumLength(50).WithMessage("Target language cannot exceed 50 characters");
-
-        RuleFor(x => x.Country)
-            .MaximumLength(100).WithMessage("Country cannot exceed 100 characters");
     }
 }

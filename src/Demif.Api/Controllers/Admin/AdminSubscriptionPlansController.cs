@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Demif.Api.Controllers.Admin;
 
 /// <summary>
-/// Admin API Controller cho quản lý Subscription Plans
+/// Admin — Subscription Plan Management (CRUD, statistics)
 /// </summary>
 [Route("api/admin/subscription-plans")]
 [ApiController]
@@ -20,7 +20,7 @@ public class AdminSubscriptionPlansController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy tất cả plans với thống kê người đăng ký
+    /// List all plans with subscriber statistics.
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
@@ -34,7 +34,7 @@ public class AdminSubscriptionPlansController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy thống kê tổng quan
+    /// Get subscription statistics overview.
     /// </summary>
     [HttpGet("stats")]
     public async Task<IActionResult> GetStats(CancellationToken cancellationToken)
@@ -54,7 +54,7 @@ public class AdminSubscriptionPlansController : ControllerBase
     }
 
     /// <summary>
-    /// Tạo plan mới
+    /// Create a new subscription plan.
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> Create(
@@ -70,7 +70,7 @@ public class AdminSubscriptionPlansController : ControllerBase
     }
 
     /// <summary>
-    /// Cập nhật plan (bao gồm giá)
+    /// Update plan (including pricing).
     /// </summary>
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(
@@ -93,7 +93,7 @@ public class AdminSubscriptionPlansController : ControllerBase
     }
 
     /// <summary>
-    /// Xóa plan (soft delete)
+    /// Delete plan (soft delete).
     /// </summary>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
