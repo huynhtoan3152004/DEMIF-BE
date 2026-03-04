@@ -13,11 +13,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace Demif.Api.Controllers;
 
 /// <summary>
-/// Users Controller - API quản lý users cho Admin
-/// Yêu cầu role Admin để truy cập
+/// Admin — User Management (CRUD, status, roles)
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/users")]
 [Authorize(Policy = "RequireAdmin")]
 public class UsersController : ControllerBase
 {
@@ -53,8 +52,12 @@ public class UsersController : ControllerBase
         _currentUserService = currentUserService;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // User CRUD
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Lấy danh sách users với pagination
+    /// List users with pagination.
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(GetUsersResponse), 200)]
@@ -67,7 +70,7 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy chi tiết user theo ID
+    /// Get user details by ID.
     /// </summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(GetUserByIdResponse), 200)]
@@ -85,7 +88,7 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Tạo user mới
+    /// Create a new user.
     /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(object), 201)]
@@ -111,7 +114,7 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Cập nhật thông tin user
+    /// Update user information.
     /// </summary>
     [HttpPut("{id:guid}")]
     [ProducesResponseType(200)]
@@ -138,7 +141,7 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Xóa user (soft delete)
+    /// Delete user (soft delete).
     /// </summary>
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(200)]
@@ -156,8 +159,12 @@ public class UsersController : ControllerBase
         return Ok(new { message = "User deleted successfully" });
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Status & Roles
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Thay đổi status user (Activate/Deactivate/Ban)
+    /// Update user status (Activate/Deactivate/Ban).
     /// </summary>
     [HttpPatch("{id:guid}/status")]
     [ProducesResponseType(200)]
@@ -184,7 +191,7 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Gán role cho user
+    /// Assign a role to user.
     /// </summary>
     [HttpPost("{id:guid}/roles")]
     [ProducesResponseType(200)]
@@ -213,7 +220,7 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Xóa role khỏi user
+    /// Remove a role from user.
     /// </summary>
     [HttpDelete("{id:guid}/roles/{roleName}")]
     [ProducesResponseType(200)]

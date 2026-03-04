@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Demif.Api.Controllers;
 
 /// <summary>
-/// API Controller cho Subscription Plans
+/// Subscription Plans — Browse plans, subscribe, manage subscription
 /// </summary>
 [Route("api/subscription-plans")]
 [ApiController]
@@ -31,8 +31,12 @@ public class SubscriptionPlansController : ControllerBase
         _cancelSubscriptionService = cancelSubscriptionService;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Public — Browse Plans
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Lấy danh sách các gói subscription đang active
+    /// List all active subscription plans.
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetPlans(CancellationToken cancellationToken)
@@ -45,8 +49,12 @@ public class SubscriptionPlansController : ControllerBase
         return Ok(result.Value);
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Authenticated — Manage My Subscription
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Đăng ký gói Premium (tạo payment pending)
+    /// Subscribe to a Premium plan (creates pending payment).
     /// </summary>
     [HttpPost("subscribe")]
     [Authorize(Policy = "RequireUser")]
@@ -74,7 +82,7 @@ public class SubscriptionPlansController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy subscription hiện tại của user đang đăng nhập
+    /// Get current user's active subscription.
     /// </summary>
     [HttpGet("my-subscription")]
     [Authorize(Policy = "RequireUser")]
@@ -93,7 +101,7 @@ public class SubscriptionPlansController : ControllerBase
     }
 
     /// <summary>
-    /// Hủy auto-renew subscription
+    /// Cancel auto-renewal for current subscription.
     /// </summary>
     [HttpPost("cancel")]
     [Authorize(Policy = "RequireUser")]

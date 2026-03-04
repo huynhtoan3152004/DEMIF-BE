@@ -1,6 +1,6 @@
-using Demif.Application.Features.Lessons.GetDictationExercise;
-using Demif.Application.Features.Lessons.GetLessonById;
 using Demif.Application.Features.Lessons.GetLessons;
+using Demif.Application.Features.Lessons.GetLessonById;
+using Demif.Application.Features.Lessons.GetDictationExercise;
 using Demif.Application.Features.Lessons.SubmitDictation;
 using Demif.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Demif.Api.Controllers;
 
 /// <summary>
-/// API Controller cho Lessons (public + premium)
+/// Lessons — Browse lessons, practice dictation exercises
 /// </summary>
 [Route("api/lessons")]
 [ApiController]
@@ -32,9 +32,12 @@ public class LessonsController : ControllerBase
         _submitDictationService = submitDictationService;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Lesson Listing & Details
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Lấy danh sách lessons với pagination.
-    /// Hỗ trợ filter: level (string "Beginner" hoặc số 0), type, category.
+    /// Get paginated list of lessons. Filter by: level, type, category.
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetLessons(
@@ -55,7 +58,7 @@ public class LessonsController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy chi tiết lesson (kiểm tra premium access).
+    /// Get lesson detail (checks premium access).
     /// </summary>
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetLessonById(Guid id, CancellationToken cancellationToken)
@@ -76,9 +79,13 @@ public class LessonsController : ControllerBase
         return Ok(result.Value);
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Dictation Exercises
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Lấy dictation exercise (blanks KHÔNG có đáp án).
-    /// GET /api/lessons/{id}/dictation?level=Beginner (hoặc ?level=0)
+    /// Get dictation exercise (blanks without answers).
+    /// Level: Beginner|Intermediate|Advanced|Expert (or 0|1|2|3).
     /// </summary>
     [HttpGet("{id:guid}/dictation")]
     public async Task<IActionResult> GetDictationExercise(
@@ -114,9 +121,8 @@ public class LessonsController : ControllerBase
     }
 
     /// <summary>
-    /// Submit dictation answers → chấm điểm + lưu kết quả.
-    /// POST /api/lessons/{id}/dictation/submit
-    /// Level trong body: "Beginner"/"Intermediate"/"Advanced"/"Expert"
+    /// Submit dictation answers — scoring + save results.
+    /// Requires authentication.
     /// </summary>
     [HttpPost("{id:guid}/dictation/submit")]
     [Authorize]

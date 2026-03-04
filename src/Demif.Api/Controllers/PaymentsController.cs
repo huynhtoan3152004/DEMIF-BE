@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Demif.Api.Controllers;
 
 /// <summary>
-/// API Controller cho Payments và Webhooks
+/// Payments — Webhook callbacks for payment providers
 /// </summary>
 [Route("api/payments")]
 [ApiController]

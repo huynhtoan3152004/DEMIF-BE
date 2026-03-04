@@ -66,9 +66,6 @@ public class RegisterService
             Username = request.Username.Trim(),
             PasswordHash = _passwordHasher.Hash(request.Password),
             Status = UserStatus.Active,
-            Country = request.Country,
-            NativeLanguage = request.NativeLanguage,
-            TargetLanguage = request.TargetLanguage,
             AuthProvider = "email",
             LastLoginAt = DateTime.UtcNow
         };

@@ -1,53 +1,56 @@
+using Demif.Application.Features.Auth.Register;
+using Demif.Application.Features.Auth.VerifyEmail;
 using Demif.Application.Features.Auth.Login;
 using Demif.Application.Features.Auth.GoogleLogin;
-using Demif.Application.Features.Auth.Register;
 using Demif.Application.Features.Auth.RefreshToken;
 using Demif.Application.Features.Auth.Logout;
-using Demif.Application.Features.Auth.VerifyEmail;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Demif.Api.Controllers;
 
 /// <summary>
-/// Auth Controller — Email/Password + Google OAuth + Email Verification
+/// Authentication — Register, Verify Email, Login (Email + Google), Token Management
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/auth")]
 public class AuthController : ControllerBase
 {
+    private readonly RegisterService _registerService;
+    private readonly VerifyEmailService _verifyEmailService;
     private readonly LoginService _loginService;
     private readonly GoogleLoginService _googleLoginService;
-    private readonly RegisterService _registerService;
     private readonly RefreshTokenService _refreshTokenService;
     private readonly LogoutService _logoutService;
-    private readonly VerifyEmailService _verifyEmailService;
-    private readonly IValidator<LoginRequest> _loginValidator;
     private readonly IValidator<RegisterRequest> _registerValidator;
+    private readonly IValidator<LoginRequest> _loginValidator;
 
     public AuthController(
+        RegisterService registerService,
+        VerifyEmailService verifyEmailService,
         LoginService loginService,
         GoogleLoginService googleLoginService,
-        RegisterService registerService,
         RefreshTokenService refreshTokenService,
         LogoutService logoutService,
-        VerifyEmailService verifyEmailService,
-        IValidator<LoginRequest> loginValidator,
-        IValidator<RegisterRequest> registerValidator)
+        IValidator<RegisterRequest> registerValidator,
+        IValidator<LoginRequest> loginValidator)
     {
+        _registerService = registerService;
+        _verifyEmailService = verifyEmailService;
         _loginService = loginService;
         _googleLoginService = googleLoginService;
-        _registerService = registerService;
         _refreshTokenService = refreshTokenService;
         _logoutService = logoutService;
-        _verifyEmailService = verifyEmailService;
-        _loginValidator = loginValidator;
         _registerValidator = registerValidator;
+        _loginValidator = loginValidator;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Registration & Email Verification
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Đăng ký tài khoản mới — gửi email xác nhận, KHÔNG trả JWT ngay.
-    /// Fields: email, password, confirmPassword, username, nativeLanguage, targetLanguage, country
+    /// Register a new account — sends verification email, does NOT return JWT.
     /// </summary>
     [HttpPost("register")]
     [ProducesResponseType(typeof(RegisterResponse), 200)]
@@ -77,8 +80,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Xác nhận email sau khi đăng ký — trả về JWT để auto-login.
-    /// GET /api/auth/verify-email?token=xxx
+    /// Verify email after registration — returns JWT for auto-login.
     /// </summary>
     [HttpGet("verify-email")]
     [ProducesResponseType(typeof(VerifyEmailResponse), 200)]
@@ -106,8 +108,12 @@ public class AuthController : ControllerBase
         return Ok(result.Value);
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Login (Email/Password + Google OAuth)
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Đăng nhập Email/Password — yêu cầu email đã xác nhận.
+    /// Login with Email/Password — requires verified email.
     /// </summary>
     [HttpPost("login")]
     [ProducesResponseType(typeof(LoginResponse), 200)]
@@ -137,8 +143,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Đăng nhập bằng Google OAuth — nhận Google ID Token từ NextAuth.js.
-    /// POST /api/auth/google-login  { "idToken": "..." }
+    /// Login with Google OAuth — receives Google ID Token from client.
     /// </summary>
     [HttpPost("google-login")]
     [ProducesResponseType(typeof(GoogleLoginResponse), 200)]
@@ -158,8 +163,12 @@ public class AuthController : ControllerBase
         return Ok(result.Value);
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Token Management
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Refresh JWT access token
+    /// Refresh JWT access token using refresh token.
     /// </summary>
     [HttpPost("refresh-token")]
     [ProducesResponseType(typeof(RefreshTokenResponse), 200)]
@@ -178,7 +187,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Đăng xuất — revoke refresh token
+    /// Logout — revoke refresh token.
     /// </summary>
     [HttpPost("logout")]
     [ProducesResponseType(200)]
