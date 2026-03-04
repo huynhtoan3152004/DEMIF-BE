@@ -4,6 +4,7 @@ using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Common.Models;
 using Demif.Domain.Entities;
 using Demif.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Demif.Application.Features.Lessons.SubmitDictation;
@@ -137,6 +138,9 @@ public class SubmitDictationService
         _dbContext.UserExercises.Add(exercise);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        // Update denormalized stats on Lesson
+        await UpdateLessonStatsAsync(lesson, lessonId, cancellationToken);
+
         _logger.LogInformation(
             "User {UserId} submitted dictation for lesson {LessonId} (Level: {Level}): {Score}% ({Correct}/{Total})",
             userId, lessonId, level, Math.Round(score, 1), correctCount, totalBlanks);
@@ -154,6 +158,35 @@ public class SubmitDictationService
             Results = results,
             TimeSpentSeconds = request.TimeSpentSeconds
         });
+    }
+
+    /// <summary>
+    /// Recalculate and persist CompletionsCount + AvgScore for a lesson.
+    /// Runs after every successful submission to keep denormalized stats in sync.
+    /// </summary>
+    private async Task UpdateLessonStatsAsync(Lesson lesson, Guid lessonId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var stats = await _dbContext.UserExercises
+                .Where(e => e.LessonId == lessonId && e.ExerciseType == ExerciseType.Dictation)
+                .GroupBy(_ => 1)
+                .Select(g => new { Count = g.Count(), Avg = (decimal)g.Average(e => e.Score) })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (stats is null) return;
+
+            lesson.CompletionsCount = stats.Count;
+            lesson.AvgScore = Math.Round(stats.Avg, 1);
+
+            await _lessonRepository.UpdateAsync(lesson, cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Stats update is non-critical — do not fail the submission
+            _logger.LogWarning(ex, "Failed to update lesson stats for {LessonId}", lessonId);
+        }
     }
 
     /// <summary>

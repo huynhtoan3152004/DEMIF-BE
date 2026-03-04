@@ -1,10 +1,8 @@
-using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Features.Lessons;
 using Demif.Application.Features.Lessons.GetDictationExercise;
 using Demif.Domain.Entities;
 using Demif.Domain.Enums;
-using Microsoft.EntityFrameworkCore;
 using Moq;
 
 namespace Demif.Tests.Lessons;
@@ -15,14 +13,14 @@ namespace Demif.Tests.Lessons;
 public class GetDictationExerciseServiceTests
 {
     private readonly Mock<ILessonRepository> _lessonRepoMock;
-    private readonly Mock<IApplicationDbContext> _dbContextMock;
+    private readonly Mock<IUserSubscriptionRepository> _subscriptionRepoMock;
     private readonly GetDictationExerciseService _service;
 
     public GetDictationExerciseServiceTests()
     {
         _lessonRepoMock = new Mock<ILessonRepository>();
-        _dbContextMock = new Mock<IApplicationDbContext>();
-        _service = new GetDictationExerciseService(_lessonRepoMock.Object, _dbContextMock.Object);
+        _subscriptionRepoMock = new Mock<IUserSubscriptionRepository>();
+        _service = new GetDictationExerciseService(_lessonRepoMock.Object, _subscriptionRepoMock.Object);
     }
 
     private static Lesson CreateLessonWithTemplates(bool isPremium = false)

@@ -3,6 +3,8 @@ using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Features.Lessons.Admin;
 using Demif.Domain.Entities;
 using Demif.Domain.Enums;
+using FluentValidation;
+using FluentValidation.Results;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -16,6 +18,7 @@ public class AdminLessonServiceTests
     private readonly Mock<ILessonRepository> _lessonRepoMock;
     private readonly Mock<IApplicationDbContext> _dbContextMock;
     private readonly Mock<ILogger<AdminLessonService>> _loggerMock;
+    private readonly Mock<IValidator<CreateUpdateLessonRequest>> _validatorMock;
     private readonly AdminLessonService _service;
 
     public AdminLessonServiceTests()
@@ -23,7 +26,18 @@ public class AdminLessonServiceTests
         _lessonRepoMock = new Mock<ILessonRepository>();
         _dbContextMock = new Mock<IApplicationDbContext>();
         _loggerMock = new Mock<ILogger<AdminLessonService>>();
-        _service = new AdminLessonService(_lessonRepoMock.Object, _dbContextMock.Object, _loggerMock.Object);
+        _validatorMock = new Mock<IValidator<CreateUpdateLessonRequest>>();
+
+        // Default: validation always passes
+        _validatorMock
+            .Setup(v => v.ValidateAsync(It.IsAny<CreateUpdateLessonRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ValidationResult());
+
+        _service = new AdminLessonService(
+            _lessonRepoMock.Object,
+            _dbContextMock.Object,
+            _loggerMock.Object,
+            _validatorMock.Object);
     }
 
     private static CreateUpdateLessonRequest CreateValidRequest()

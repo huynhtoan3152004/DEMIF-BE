@@ -29,7 +29,11 @@ public class CreateUpdateLessonRequest
     public bool IsPremiumOnly { get; set; }
     public int DisplayOrder { get; set; }
     public string? Tags { get; set; }
-    public string Status { get; set; } = "published";
+    /// <summary>
+    /// Default là "draft" — admin phải chủ động PATCH /status = "published" sau khi đã có transcript.
+    /// Tránh lesson không có DictationTemplates bị publish tự động.
+    /// </summary>
+    public string Status { get; set; } = "draft";
 }
 
 /// <summary>

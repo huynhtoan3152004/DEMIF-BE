@@ -25,7 +25,7 @@ public class GetLessonByIdService
         CancellationToken cancellationToken = default)
     {
         var lesson = await _lessonRepository.GetByIdAsync(lessonId, cancellationToken);
-        if (lesson is null)
+        if (lesson is null || lesson.Status != "published")
         {
             return Result.Failure<GetLessonByIdResponse>(Error.NotFound("Không tìm thấy bài học."));
         }

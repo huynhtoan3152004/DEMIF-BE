@@ -1,6 +1,8 @@
+using Demif.Application.Features.Lessons.CheckSegment;
 using Demif.Application.Features.Lessons.GetDictationExercise;
 using Demif.Application.Features.Lessons.GetLessonById;
 using Demif.Application.Features.Lessons.GetLessons;
+using Demif.Application.Features.Lessons.GetLessonSegments;
 using Demif.Application.Features.Lessons.SubmitDictation;
 using Demif.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
@@ -19,17 +21,23 @@ public class LessonsController : ControllerBase
     private readonly GetLessonByIdService _getLessonByIdService;
     private readonly GetDictationExerciseService _getDictationExerciseService;
     private readonly SubmitDictationService _submitDictationService;
+    private readonly GetLessonSegmentsService _getSegmentsService;
+    private readonly CheckSegmentService _checkSegmentService;
 
     public LessonsController(
         GetLessonsService getLessonsService,
         GetLessonByIdService getLessonByIdService,
         GetDictationExerciseService getDictationExerciseService,
-        SubmitDictationService submitDictationService)
+        SubmitDictationService submitDictationService,
+        GetLessonSegmentsService getSegmentsService,
+        CheckSegmentService checkSegmentService)
     {
         _getLessonsService = getLessonsService;
         _getLessonByIdService = getLessonByIdService;
         _getDictationExerciseService = getDictationExerciseService;
         _submitDictationService = submitDictationService;
+        _getSegmentsService = getSegmentsService;
+        _checkSegmentService = checkSegmentService;
     }
 
     /// <summary>
@@ -137,6 +145,67 @@ public class LessonsController : ControllerBase
                 "NotFound" => NotFound(new { error = result.Error.Message }),
                 "Forbidden" => StatusCode(403, new { error = result.Error.Message }),
                 _ => BadRequest(new { error = result.Error.Message })
+            };
+        }
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Lấy danh sách segments của bài theo level config.
+    /// GET /api/lessons/{id}/segments?level=Intermediate
+    /// 
+    /// LevelConfig trong response cho FE biết:
+    /// - showTranscriptBefore: có hiện text trước khi user gõ không
+    /// - showTranscriptAfter: có auto-hiện transcript sau check không
+    /// - maxReplays: số lần replay mỗi segment (-1 = unlimited)
+    /// </summary>
+    [HttpGet("{id:guid}/segments")]
+    public async Task<IActionResult> GetLessonSegments(
+        Guid id,
+        [FromQuery] string level = "Intermediate",
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetUserIdOrNull();
+        var result = await _getSegmentsService.ExecuteAsync(id, level, userId, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Code switch
+            {
+                "NotFound"   => NotFound(new { error = result.Error.Message }),
+                "Forbidden"  => StatusCode(403, new { error = result.Error.Message }),
+                "Validation" => BadRequest(new { error = result.Error.Message }),
+                _            => BadRequest(new { error = result.Error.Message })
+            };
+        }
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Check một segment: user gõ tự do → so sánh word-by-word với transcript gốc.
+    /// POST /api/lessons/{id}/segments/{segmentIndex}/check
+    /// Luôn trả transcript trong response (học từ lỗi — Option A + C).
+    /// </summary>
+    [HttpPost("{id:guid}/segments/{segmentIndex:int}/check")]
+    [Authorize]
+    public async Task<IActionResult> CheckSegment(
+        Guid id,
+        int segmentIndex,
+        [FromBody] CheckSegmentRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetUserIdOrNull()!.Value;
+        var result = await _checkSegmentService.ExecuteAsync(id, segmentIndex, request, userId, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Code switch
+            {
+                "NotFound"   => NotFound(new { error = result.Error.Message }),
+                "Validation" => BadRequest(new { error = result.Error.Message }),
+                _            => BadRequest(new { error = result.Error.Message })
             };
         }
 
