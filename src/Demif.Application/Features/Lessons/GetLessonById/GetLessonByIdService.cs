@@ -47,6 +47,10 @@ public class GetLessonByIdService
             }
         }
 
+        var mediaUrl = lesson.MediaUrl ?? lesson.AudioUrl;
+        var mediaType = lesson.MediaType ?? "audio";
+        var isYouTube = string.Equals(mediaType, "youtube", StringComparison.OrdinalIgnoreCase);
+
         return Result.Success(new GetLessonByIdResponse
         {
             Id = lesson.Id,
@@ -55,9 +59,11 @@ public class GetLessonByIdService
             LessonType = lesson.LessonType.ToString(),
             Level = lesson.Level.ToString(),
             Category = lesson.Category,
-            MediaUrl = lesson.MediaUrl ?? lesson.AudioUrl,
+            MediaUrl = mediaUrl,
             AudioUrl = lesson.AudioUrl,
-            MediaType = lesson.MediaType ?? "audio",
+            MediaType = mediaType,
+            VideoId = isYouTube ? ExtractYouTubeVideoId(mediaUrl) : null,
+            EmbedUrl = isYouTube ? mediaUrl : null,
             DurationSeconds = lesson.DurationSeconds,
             ThumbnailUrl = lesson.ThumbnailUrl,
             FullTranscript = lesson.FullTranscript,
@@ -71,5 +77,15 @@ public class GetLessonByIdService
             Tags = lesson.Tags,
             CreatedAt = lesson.CreatedAt
         });
+    }
+
+    /// <summary>
+    /// Extract YouTube video ID from embed URL (https://www.youtube.com/embed/{videoId}).
+    /// </summary>
+    private static string? ExtractYouTubeVideoId(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+        var match = System.Text.RegularExpressions.Regex.Match(url, @"(?:embed|v|vi)[/=]([a-zA-Z0-9_-]{11})");
+        return match.Success ? match.Groups[1].Value : null;
     }
 }

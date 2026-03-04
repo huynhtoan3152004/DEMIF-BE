@@ -33,7 +33,7 @@ public class CreateUpdateLessonRequest
 }
 
 /// <summary>
-/// Response cho admin lesson với full info
+/// Admin lesson detail DTO with full info.
 /// </summary>
 public class AdminLessonDto
 {
@@ -43,9 +43,22 @@ public class AdminLessonDto
     public string LessonType { get; set; } = string.Empty;
     public string Level { get; set; } = string.Empty;
     public string? Category { get; set; }
+
+    /// <summary>Legacy audio URL.</summary>
     public string AudioUrl { get; set; } = string.Empty;
+
+    /// <summary>Primary media URL (MP3 path or YouTube embed URL).</summary>
     public string? MediaUrl { get; set; }
+
+    /// <summary>"audio" | "video" | "youtube"</summary>
     public string? MediaType { get; set; }
+
+    /// <summary>YouTube Video ID (populated when MediaType == "youtube").</summary>
+    public string? VideoId { get; set; }
+
+    /// <summary>YouTube embed URL (populated when MediaType == "youtube").</summary>
+    public string? EmbedUrl { get; set; }
+
     public int DurationSeconds { get; set; }
     public string? ThumbnailUrl { get; set; }
     public string FullTranscript { get; set; } = string.Empty;

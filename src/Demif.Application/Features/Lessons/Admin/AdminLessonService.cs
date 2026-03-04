@@ -240,6 +240,9 @@ public class AdminLessonService
 
     private static AdminLessonDto MapToDto(Lesson lesson)
     {
+        var mediaType = lesson.MediaType;
+        var isYouTube = string.Equals(mediaType, "youtube", StringComparison.OrdinalIgnoreCase);
+
         return new AdminLessonDto
         {
             Id = lesson.Id,
@@ -251,6 +254,8 @@ public class AdminLessonService
             AudioUrl = lesson.AudioUrl,
             MediaUrl = lesson.MediaUrl,
             MediaType = lesson.MediaType,
+            VideoId = isYouTube ? ExtractYouTubeVideoId(lesson.MediaUrl) : null,
+            EmbedUrl = isYouTube ? lesson.MediaUrl : null,
             DurationSeconds = lesson.DurationSeconds,
             ThumbnailUrl = lesson.ThumbnailUrl,
             FullTranscript = lesson.FullTranscript,
@@ -265,6 +270,16 @@ public class AdminLessonService
             CreatedAt = lesson.CreatedAt,
             UpdatedAt = lesson.UpdatedAt
         };
+    }
+
+    /// <summary>
+    /// Extract YouTube video ID from embed URL (https://www.youtube.com/embed/{videoId}).
+    /// </summary>
+    private static string? ExtractYouTubeVideoId(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+        var match = System.Text.RegularExpressions.Regex.Match(url, @"(?:embed|v|vi)[/=]([a-zA-Z0-9_-]{11})");
+        return match.Success ? match.Groups[1].Value : null;
     }
 }
 
