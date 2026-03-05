@@ -1,0 +1,99 @@
+# 🚀 DEMIF — Bản Kế Hoạch Đóng Gói Sản Phẩm (Master Action Plan)
+
+> Chiến lược hoàn thiện 3 MVP (Dictation, Shadowing, Cá Nhân Hóa) trong 4 tuần cuối.
+> Khai thác triệt để VPS cá nhân + Hệ sinh thái n8n (Tự động hóa hoàn toàn & Zero API Cost).
+> Cập nhật: 05/03/2026.
+
+---
+
+## 🏗️ 1. HẠ TẦNG CẦN DEPLOY LÊN VPS CHUẨN BỊ (Làm ngay 1 ngày)
+
+Để tiết kiệm chi phí nhưng vận hành trơn tru nhất, VPS của bạn sẽ chứa 3 thành phần chạy ngầm (Docker Containers):
+1. **[Core Backend]** .NET 8 API (Như cũ, giữ vai trò Database, Auth, và Chấm chữ cơ bản LCS).
+2. **[Workflow Orchestrator]** n8n (Tự host, giao diện web, kéo thả logic cá nhân hóa, gửi Email, Crawl data).
+3. **[AI Engine - Tùy cấu hình VPS]** Whisper.cpp API hoặc bản FastAPI (Chỉ chờ nhận Audio và xuất Text, phục vụ Shadowing).
+
+*(Lưu ý: Nếu VPS của bạn yếu < 4GB RAM và không GPU, AI Engine cho Shadowing có thể đẩy sang Web Speech API trên Browser của Browser để giảm tải).*
+
+---
+
+## 📦 2. GIAI ĐOẠN 1: TRIỂN KHAI BACKEND CỐT LÕI (Tuần 1-2)
+
+*Đây là phần cần code C# .NET. Phải làm xong để App có Retention (giữ chân user) và ra tiền.*
+
+### A. Quản Lý Subscription Cho Admin (Doanh thu)
+- [ ] `GET /api/admin/user-subscriptions` — Danh sách User trả phí.
+- [ ] `GET /api/admin/user-subscriptions/{id}` — Xem lịch sử gia hạn, thanh toán.
+- [ ] `PATCH /api/admin/user-subscriptions/{id}/extend` — Nút gia hạn thủ công / tặng Premium.
+- [ ] `PATCH /api/admin/user-subscriptions/{id}/cancel` — Nút hủy gia hạn.
+
+### B. Progress & Streak (Động lực học lại)
+- [ ] `GET /api/me/progress` — Lấy `TotalPoints`, `% hoàn thành level`, tổng bài đã học.
+- [ ] `GET /api/me/streak` — Lấy chuỗi ngày học liên tiếp (`CurrentStreak`), số lượt Freeze còn lại.
+- [ ] `POST /api/me/activity` — Tự động gọi khi hoàn thành 1 phiên (làm xong 1 dictation/shadowing) -> Cộng điểm, +1 streak.
+
+### C. Refactor Cấu Trúc Controllers Theo Chuẩn (Technical Debt)
+- [ ] Tách [BlogsController](file:///c:/Users/ToanDev/WorkSpace/EXE/Demif-BE/Demif-BE/src/Demif.Api/Controllers/BlogsController.cs#13-91) — Tạo nhánh con `/api/admin/blogs` cho Create/Update/Delete (bảo vệ bằng Role Admin).
+- [ ] Đổi [UsersController](file:///c:/Users/ToanDev/WorkSpace/EXE/Demif-BE/Demif-BE/src/Demif.Api/Controllers/UsersController.cs#33-54) thành `AdminUsersController` với route `/api/admin/users`.
+- [ ] Setup `AddRateLimiter` (Chống spam API) trong [Program.cs](file:///c:/Users/ToanDev/WorkSpace/EXE/Demif-BE/Demif-BE/src/Demif.Api/Program.cs).
+
+---
+
+## 🎤 3. GIAI ĐOẠN 2: SHADOWING MVP (Tuần 2-3)
+
+*Áp dụng chiến lược: Self-hosted AI trên VPS (Zero API Cost) nhưng giữ logic Backend đơn giản.*
+
+### Flow Hệ Thống:
+1. User bấm Record trên Angular/React Frontend (Nghe mẫu → Nhại lại câu).
+2. FE gửi Blob `.webm/.wav` audio lên `.NET Backend` (`POST /api/lessons/{id}/segments/{i}/shadowing`).
+3. .NET Backend chuyển tiếp (Forward) file Audio này qua mạng nội bộ VPS đến Cổng (Port) của `Whisper API` (Ví dụ `localhost:8080/inference`).
+4. Whisper nhả Text đã nhận diện được trả về .NET.
+5. .NET chạy hàm [CheckSegmentService](file:///c:/Users/ToanDev/WorkSpace/EXE/Demif-BE/Demif-BE/src/Demif.Application/Features/Lessons/CheckSegment/CheckSegmentService.cs#21-285) (của Dictation đã có sẵn) -> Chấm Text của Whisper vs Text Transcript của Video.
+6. Tính Mức Độ Giống Nhau (`Accuracy %`) và List Từ Đúng/Sai.
+7. Lưu lại thành [UserExercise](file:///c:/Users/ToanDev/WorkSpace/EXE/Demif-BE/Demif-BE/src/Demif.Domain/Entities/UserExercise.cs#9-44) type `Shadowing`.
+
+### Các Task Code:
+- [ ] Deploy Docker `whisper-api` trên VPS.
+- [ ] Tạo `CheckShadowingService.cs` (Kế thừa Logic từ Dictation nhưng đầu vào là IFormFile Audio thay vì Text).
+- [ ] Setup `HttpClient` trong DI để giao tiếp cục bộ từ Backend -> Whisper.
+
+---
+
+## 🧠 4. GIAI ĐOẠN 3: CÁ NHÂN HÓA BẰNG n8n (Tuần 3-4)
+
+*Tận dụng n8n để KHÔNG cần code C# logic lập lịch phức tạp, thay đổi thuật toán ngay trên Browser.*
+
+### Workflow 1: Auto-assign "Bài Phù Hợp" Mỗi Ngày (Personalized Routing)
+- **Nơi Setup:** Giao diện n8n (Cron Trigger).
+- **Cách làm:**
+  - 12h Đêm n8n quét DB PostgreSQL: Kéo bảng `UserExercises` (Tìm những từ tiếng Anh bị sai nhiều nhất của từng User).
+  - Tùy chọn (Nếu VPS mạnh): Đẩy List Từ Sai qua `Ollama node` (Tự host Llama) kêu nó *"Hãy tìm 3 bài học LessonID tốt nhất trong Database chứa các từ vựng này cho Level Beginner"*.
+  - *Nếu VPS yếu*: Dùng node `PostgresQuery` tìm các bài có chứa từ vựng yếu đó bằng SQL thuần (`LIKE`).
+  - Ghi ngầm dữ liệu danh sách bài Recomend ngược lại vào DB (`RecommendedLessons` table).
+- **Task code Backend:** [ ] Viết API `GET /api/me/recommendations` chỉ đơn giản là đọc bảng `RecommendedLessons` mà n8n vừa fill.
+
+### Workflow 2: Cỗ Máy "Sản Xuất Bài Học" Tự Động (Auto Data Ingestion)
+- **Nơi Setup:** n8n (Cron Trigger mỗi 6h sáng).
+- **Cách làm:**
+  - Node `RSS Feed` đọc tin tức `learningenglish.voanews.com`.
+  - Node `HTTP Request` để download MP3 và nội dung text.
+  - Tự động gọi chính API của APP bạn: `POST /api/admin/lessons` (Nhét Token Static Admin) -> Post tự động bài học.
+  - Vậy là hệ thống tự Auto-post bài học mỗi ngày không cần Nhân sự làm tay.
+
+---
+
+## 📈 5. GIAI ĐOẠN POST-MVP (Sau 4 tuần - Lúc launch xong)
+
+- **Workflow 3 (n8n)**: Bắn Email nhắc nhở (Streak Reminder). Nếu 2 ngày User không vô, n8n quét DB -> Gửi Mail tự động. (Dùng SendGrid hoặc Gmail node có sẵn ở n8n).
+- **Tính năng Từ Vựng Cá Nhân (Vocabulary)**: (Tuần 5). Thêm API lưu từ sai của Dictation vào `UserVocabulary` để ôm mảng Flashcard Spaced Repetition.
+- **Leaderboard (Bảng Xếp Hạng)**: Lên Ranking hàng tuần.
+
+---
+
+## ✅ KẾT LUẬN & ĐỀ XUẤT HÀNH ĐỘNG HÔM NAY
+
+👉 **Toàn bộ Lộ Trình này Đã Kết Nối:** Lấy Data của Dictation/Shadowing (Backend) -> Phân tích (Bởi n8n) -> Ra lộ trình Cá nhân hóa. Bạn vừa có sản phẩm xịn, vừa là "Tự Chủ Công Nghệ" rẻ nhất vì tận dụng VPS trống.
+
+**Anh muốn em Code cái gì đầu tiên ở Tuần 1?**
+1. APIs **Progress & Streak** (Cho User xem điểm và giữ lửa trên App ngay).
+2. Hay đổi cấu trúc **Admin/Public API** và làm chức năng **Gia Hạn Subscription** cho Admin luôn cho chuẩn Backend ngay từ gốc.?

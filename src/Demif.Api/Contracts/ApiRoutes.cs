@@ -68,13 +68,35 @@ public static class ApiRoutes
 
     public static class AdminUsers
     {
-        public const string GetAll = $"{Base}/users";
-        public const string GetById = $"{Base}/users/{{id}}";
-        public const string Create = $"{Base}/users";
-        public const string Update = $"{Base}/users/{{id}}";
-        public const string Delete = $"{Base}/users/{{id}}";
-        public const string UpdateStatus = $"{Base}/users/{{id}}/status";
-        public const string AssignRole = $"{Base}/users/{{id}}/roles";
-        public const string RemoveRole = $"{Base}/users/{{id}}/roles/{{roleName}}";
+        public const string GetAll = $"{Base}/admin/users";
+        public const string GetById = $"{Base}/admin/users/{{id}}";
+        public const string Create = $"{Base}/admin/users";
+        public const string Update = $"{Base}/admin/users/{{id}}";
+        public const string Delete = $"{Base}/admin/users/{{id}}";
+        public const string UpdateStatus = $"{Base}/admin/users/{{id}}/status";
+        public const string AssignRole = $"{Base}/admin/users/{{id}}/roles";
+        public const string RemoveRole = $"{Base}/admin/users/{{id}}/roles/{{roleName}}";
+    }
+
+    public static class Me
+    {
+        public const string GetProgress = $"{Base}/me/progress";
+        public const string GetStreak = $"{Base}/me/streak";
+        public const string RecordActivity = $"{Base}/me/activity";
+    }
+
+    public static class AdminUserSubscriptions
+    {
+        public const string GetAll = $"{Base}/admin/user-subscriptions";
+        public const string GetById = $"{Base}/admin/user-subscriptions/{{id}}";
+        public const string Extend = $"{Base}/admin/user-subscriptions/{{id}}/extend";
+        public const string Cancel = $"{Base}/admin/user-subscriptions/{{id}}/cancel";
+    }
+
+    public static class AdminBlogs
+    {
+        public const string Create = $"{Base}/admin/blogs";
+        public const string Update = $"{Base}/admin/blogs/{{id}}";
+        public const string Delete = $"{Base}/admin/blogs/{{id}}";
     }
 }

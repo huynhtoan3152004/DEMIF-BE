@@ -16,8 +16,9 @@ namespace Demif.Api.Controllers;
 /// Admin — User Management (CRUD, status, roles)
 /// </summary>
 [ApiController]
-[Route("api/users")]
+[Route("api/admin/users")]
 [Authorize(Policy = "RequireAdmin")]
+[Tags("Admin - Users")]
 public class UsersController : ControllerBase
 {
     private readonly GetUsersService _getUsersService;

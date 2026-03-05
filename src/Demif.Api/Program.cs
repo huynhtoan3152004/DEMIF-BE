@@ -1,7 +1,9 @@
 using Demif.Api.Configurations;
 using Demif.Application;
 using Demif.Infrastructure;
+using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,10 +44,38 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Rate Limiting - protect API from abuse
+builder.Services.AddRateLimiter(opts =>
+{
+    opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // General API limit: 100 req/minute per sliding window
+    opts.AddSlidingWindowLimiter("general", o =>
+    {
+        o.PermitLimit = 100;
+        o.Window = TimeSpan.FromMinutes(1);
+        o.SegmentsPerWindow = 6;
+        o.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        o.QueueLimit = 10;
+    });
+
+    // Stricter limit for auth endpoints: 10 req/minute
+    opts.AddFixedWindowLimiter("auth", o =>
+    {
+        o.PermitLimit = 10;
+        o.Window = TimeSpan.FromMinutes(1);
+        o.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        o.QueueLimit = 0;
+    });
+});
+
 var app = builder.Build();
 
 // Enable CORS
 app.UseCors("AllowAll");
+
+// Rate Limiting
+app.UseRateLimiter();
 
 // Configure pipeline - Enable Swagger in all environments
 app.UseSwaggerConfiguration();

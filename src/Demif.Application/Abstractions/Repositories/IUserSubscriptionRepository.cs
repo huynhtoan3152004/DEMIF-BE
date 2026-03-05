@@ -7,23 +7,18 @@ namespace Demif.Application.Abstractions.Repositories;
 /// </summary>
 public interface IUserSubscriptionRepository : IGenericRepository<UserSubscription>
 {
-    /// <summary>
-    /// Lấy subscription đang active của user
-    /// </summary>
     Task<UserSubscription?> GetActiveSubscriptionAsync(Guid userId, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Lấy tất cả subscription của user
-    /// </summary>
     Task<IEnumerable<UserSubscription>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Kiểm tra user có subscription active không
-    /// </summary>
     Task<bool> HasActiveSubscriptionAsync(Guid userId, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Lấy subscription với thông tin plan
-    /// </summary>
     Task<UserSubscription?> GetByIdWithPlanAsync(Guid id, CancellationToken cancellationToken = default);
+
+    // ── Admin ──────────────────────────────────────────────────────────────
+    /// <summary>Danh sách tất cả subscription kèm User + Plan (phân trang)</summary>
+    Task<(IEnumerable<UserSubscription> Items, int Total)> GetAllWithUsersAsync(
+        int page, int pageSize,
+        string? status, string? search,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Chi tiết subscription kèm User + Plan + Payments</summary>
+    Task<UserSubscription?> GetByIdWithDetailsAsync(Guid id, CancellationToken cancellationToken = default);
 }
