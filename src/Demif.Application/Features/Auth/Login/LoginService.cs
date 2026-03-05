@@ -51,19 +51,26 @@ public class LoginService
             return Result.Failure<LoginResponse>(Error.Unauthorized("Email hoặc mật khẩu không đúng."));
         }
 
-        // 2. Kiểm tra user status
+        // 2. Yêu cầu xác nhận email trước khi đăng nhập
+        if (!user.IsEmailVerified)
+        {
+            return Result.Failure<LoginResponse>(
+                new Error("Auth.EmailNotVerified", "Email chưa được xác nhận. Vui lòng kiểm tra hộp thư và xác nhận tài khoản."));
+        }
+
+        // 3. Kiểm tra user status
         if (user.Status != UserStatus.Active)
         {
             return Result.Failure<LoginResponse>(Error.Unauthorized("Tài khoản của bạn chưa được kích hoạt."));
         }
 
-        // 3. Verify password
+        // 4. Verify password
         if (user.PasswordHash is null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
         {
             return Result.Failure<LoginResponse>(Error.Unauthorized("Email hoặc mật khẩu không đúng."));
         }
 
-        // 4. Lấy danh sách roles
+        // 5. Lấy danh sách roles
         var roles = user.UserRoles
             .Where(ur => ur.Role.IsActive)
             .Select(ur => ur.Role.Name)
@@ -75,11 +82,11 @@ public class LoginService
             roles.Add("User");
         }
 
-        // 5. Generate tokens
+        // 6. Generate tokens
         var accessToken = _jwtTokenService.GenerateAccessToken(user.Id, user.Email, roles);
         var refreshTokenValue = _jwtTokenService.GenerateRefreshToken();
 
-        // 6. Tạo refresh token entity
+        // 7. Tạo refresh token entity
         var refreshTokenDays = int.Parse(_configuration["Jwt:RefreshTokenExpirationDays"] ?? "7");
         var refreshToken = new Domain.Entities.RefreshToken
         {
@@ -90,13 +97,13 @@ public class LoginService
         };
         _dbContext.RefreshTokens.Add(refreshToken);
 
-        // 7. Cập nhật LastLoginAt
+        // 8. Cập nhật LastLoginAt
         user.LastLoginAt = DateTime.UtcNow;
         
-        // 8. Lưu TẤT CẢ thay đổi 1 LẦN DUY NHẤT
+        // 9. Lưu TẤT CẢ thay đổi 1 LẦN DUY NHẤT
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        // 9. Return response
+        // 10. Return response
         var expirationMinutes = int.Parse(_configuration["Jwt:ExpirationMinutes"] ?? "60");
         return new LoginResponse
         {

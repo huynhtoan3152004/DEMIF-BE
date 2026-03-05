@@ -5,6 +5,7 @@ using Demif.Application.Common.Models;
 using Demif.Domain.Entities;
 using Demif.Domain.Enums;
 using Microsoft.Extensions.Configuration;
+using System.Security.Cryptography;
 
 namespace Demif.Application.Features.Auth.Register;
 
@@ -17,17 +18,23 @@ public class RegisterService
     private readonly IRoleRepository _roleRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IApplicationDbContext _dbContext;
+    private readonly IEmailService _emailService;
+    private readonly IConfiguration _configuration;
 
     public RegisterService(
         IUserRepository userRepository,
         IRoleRepository roleRepository,
         IPasswordHasher passwordHasher,
-        IApplicationDbContext dbContext)
+        IApplicationDbContext dbContext,
+        IEmailService emailService,
+        IConfiguration configuration)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
         _passwordHasher = passwordHasher;
         _dbContext = dbContext;
+        _emailService = emailService;
+        _configuration = configuration;
     }
 
     public async Task<Result<RegisterResponse>> ExecuteAsync(
@@ -65,9 +72,10 @@ public class RegisterService
             Email = request.Email.ToLower().Trim(),
             Username = request.Username.Trim(),
             PasswordHash = _passwordHasher.Hash(request.Password),
-            Status = UserStatus.Active,
+            Status = UserStatus.Pending,
             AuthProvider = "email",
-            LastLoginAt = DateTime.UtcNow
+            EmailVerificationToken = GenerateEmailVerificationToken(),
+            EmailVerificationExpiry = DateTime.UtcNow.AddHours(24)
         };
 
         // 5. Gán role mặc định
@@ -85,7 +93,18 @@ public class RegisterService
         // 7. Lưu TẤT CẢ thay đổi 1 LẦN DUY NHẤT
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        // 8. Trả về response
+        // 8. Gửi email xác nhận
+        var frontendUrl = _configuration["App:FrontendUrl"]?.TrimEnd('/') ?? "http://localhost:3000";
+        var token = Uri.EscapeDataString(user.EmailVerificationToken!);
+        var verifyUrl = $"{frontendUrl}/verify-email?token={token}";
+
+        await _emailService.SendEmailVerificationAsync(
+            user.Email,
+            user.Username,
+            verifyUrl,
+            cancellationToken);
+
+        // 9. Trả về response
         return new RegisterResponse
         {
             UserId = user.Id,
@@ -94,5 +113,11 @@ public class RegisterService
             Message = "Vui lòng kiểm tra email để xác nhận tài khoản.",
             RequiresEmailVerification = true
         };
+    }
+
+    private static string GenerateEmailVerificationToken()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        return Convert.ToHexString(bytes);
     }
 }
