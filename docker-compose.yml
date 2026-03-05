@@ -19,10 +19,6 @@
 # ║  # === ASP.NET CORE ===                                                      ║
 # ║  ASPNETCORE_ENVIRONMENT=Production                                           ║
 # ║                                                                              ║
-# ║  # === FIREBASE (nếu cần) ===                                                ║
-# ║  # Firebase__project_id=your-project-id                                      ║
-# ║  # Firebase__private_key=-----BEGIN PRIVATE KEY-----\n...\n-----END...      ║
-# ║  # Firebase__client_email=firebase@your-project.iam.gserviceaccount.com      ║
 # ║                                                                              ║
 # ╠══════════════════════════════════════════════════════════════════════════════╣
 # ║  💡 HƯỚNG DẪN:                                                               ║

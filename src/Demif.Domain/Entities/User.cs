@@ -22,8 +22,7 @@ public class User : AuditableEntity
     public int DailyGoalMinutes { get; set; } = 30;
 
     // OAuth Integration
-    public string? GoogleId { get; set; }       // Google sub (thay FirebaseUid)
-    public string? FirebaseUid { get; set; }    // Legacy — giữ để backward compat
+    public string? GoogleId { get; set; }
     public string AuthProvider { get; set; } = "email"; // email | google
 
     // Email Verification

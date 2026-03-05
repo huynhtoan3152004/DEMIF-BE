@@ -5,8 +5,7 @@ Backend API cho ứng dụng DEMIF.
 ## Yêu cầu
 
 - .NET 8.0 SDK
-- PostgreSQL 
-- Firebase Account
+- PostgreSQL
 
 ## Setup
 
@@ -31,29 +30,24 @@ Sau đó mở file `src\Demif.Api\appsettings.json` và cập nhật:
 
 - **ConnectionStrings.DefaultConnection**: Connection string PostgreSQL của bạn
 - **Jwt.Key**: Secret key cho JWT (ít nhất 32 ký tự)
-- **Firebase**: Thông tin Firebase service account (lấy từ Firebase Console)
+- **Google.ClientId**: Google OAuth Client ID
+- **Smtp**: Cấu hình SMTP cho gửi email
+- **Cloudinary**: Cấu hình Cloudinary cho upload ảnh
+- **YouTube.ApiKey**: YouTube Data API key
 
-### 3. Cấu hình Firebase
-
-1. Vào [Firebase Console](https://console.firebase.google.com/)
-2. Chọn project của bạn
-3. Vào **Project Settings** → **Service Accounts**
-4. Click **Generate new private key**
-5. Copy nội dung file JSON vào phần Firebase trong `appsettings.json`
-
-### 4. Restore dependencies
+### 3. Restore dependencies
 
 ```bash
 dotnet restore
 ```
 
-### 5. Run migrations (nếu có)
+### 4. Run migrations (nếu có)
 
 ```bash
 dotnet ef database update --project src/Demif.Infrastructure --startup-project src/Demif.Api
 ```
 
-### 6. Run application
+### 5. Run application
 
 ```bash
 cd src/Demif.Api
@@ -69,7 +63,6 @@ API sẽ chạy tại `https://localhost:7xxx`
 - `appsettings.json`
 - `appsettings.Development.json`
 - `appsettings.Production.json`
-- `firebase-credentials.json`
 - Bất kỳ file nào chứa thông tin nhạy cảm
 
 Các file này đã được thêm vào `.gitignore`.

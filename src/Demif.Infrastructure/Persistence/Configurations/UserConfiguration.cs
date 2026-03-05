@@ -40,9 +40,6 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(50)
             .HasDefaultValue("English");
 
-        builder.Property(u => u.FirebaseUid)
-            .HasMaxLength(128);
-
         builder.Property(u => u.AuthProvider)
             .HasMaxLength(30)
             .HasDefaultValue("email");
@@ -50,7 +47,6 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         // Indexes
         builder.HasIndex(u => u.Email).IsUnique();
         builder.HasIndex(u => u.Username).IsUnique();
-        builder.HasIndex(u => u.FirebaseUid).IsUnique();
 
         // Relationships
         builder.HasOne(u => u.Progress)
