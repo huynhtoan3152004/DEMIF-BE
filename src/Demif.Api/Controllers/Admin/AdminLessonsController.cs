@@ -175,6 +175,29 @@ public class AdminLessonsController : ControllerBase
     }
 
     /// <summary>
+    /// Lấy transcript YouTube theo nhiều ngôn ngữ (không ghi DB).
+    /// Dùng để FE/Admin preview transcript trước khi import.
+    /// </summary>
+    [HttpGet("youtube/transcripts")]
+    public async Task<IActionResult> GetYouTubeTranscripts(
+        [FromQuery] string url,
+        [FromQuery] string preferredLanguage = "en",
+        [FromQuery] bool includeText = true,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _youTubeService.GetTranscriptsAsync(
+            url,
+            preferredLanguage,
+            includeText,
+            cancellationToken);
+
+        if (result.IsFailure)
+            return BadRequest(new { error = result.Error.Message });
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
     /// Create lesson from YouTube URL.
     /// Auto-fetches metadata + captions, generates DictationTemplates for 4 levels.
     /// </summary>

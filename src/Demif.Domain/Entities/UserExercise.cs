@@ -30,6 +30,11 @@ public class UserExercise : BaseEntity
     /// </summary>
     public string? ResultDetails { get; set; }
 
+    /// <summary>
+    /// Index segment trong bài. null = toàn bài (SubmitDictation), số = check từng segment (CheckSegment)
+    /// </summary>
+    public int? SegmentIndex { get; set; }
+
     public int Score { get; set; } // 0-100
     public int? TimeSpentSeconds { get; set; }
     public int Attempts { get; set; } = 1;

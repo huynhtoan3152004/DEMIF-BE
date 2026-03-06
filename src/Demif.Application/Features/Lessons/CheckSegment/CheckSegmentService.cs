@@ -4,6 +4,7 @@ using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Common.Models;
 using Demif.Domain.Entities;
 using Demif.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Demif.Application.Features.Lessons.CheckSegment;
@@ -249,29 +250,56 @@ public class CheckSegmentService
     {
         try
         {
-            var exercise = new UserExercise
+            var userInput = JsonSerializer.Serialize(new
             {
-                UserId = userId,
-                LessonId = lessonId,
-                ExerciseType = ExerciseType.Dictation,
-                UserInput = JsonSerializer.Serialize(new
-                {
-                    segmentIndex,
-                    userText = request.UserText,
-                    level = request.Level
-                }),
-                ResultDetails = JsonSerializer.Serialize(new
-                {
-                    segmentIndex,
-                    accuracy,
-                    wordResults
-                }),
-                Score = (int)Math.Round(accuracy),
-                TimeSpentSeconds = request.TimeSpentSeconds,
-                CompletedAt = DateTime.UtcNow
-            };
+                segmentIndex,
+                userText = request.UserText,
+                level = request.Level
+            });
+            var resultDetails = JsonSerializer.Serialize(new
+            {
+                segmentIndex,
+                accuracy,
+                wordResults
+            });
+            var newScore = (int)Math.Round(accuracy);
 
-            _dbContext.UserExercises.Add(exercise);
+            // UPSERT: tránh duplicate record cho cùng user + lesson + segment
+            var existing = await _dbContext.UserExercises
+                .FirstOrDefaultAsync(
+                    e => e.UserId == userId
+                      && e.LessonId == lessonId
+                      && e.SegmentIndex == segmentIndex
+                      && e.ExerciseType == ExerciseType.Dictation,
+                    cancellationToken);
+
+            if (existing is not null)
+            {
+                existing.Attempts++;
+                existing.Score = Math.Max(existing.Score, newScore); // giữ best score
+                existing.UserInput = userInput;
+                existing.ResultDetails = resultDetails;
+                existing.TimeSpentSeconds = request.TimeSpentSeconds;
+                existing.CompletedAt = DateTime.UtcNow;
+                _dbContext.UserExercises.Update(existing);
+            }
+            else
+            {
+                var exercise = new UserExercise
+                {
+                    UserId = userId,
+                    LessonId = lessonId,
+                    ExerciseType = ExerciseType.Dictation,
+                    SegmentIndex = segmentIndex,
+                    UserInput = userInput,
+                    ResultDetails = resultDetails,
+                    Score = newScore,
+                    TimeSpentSeconds = request.TimeSpentSeconds,
+                    CompletedAt = DateTime.UtcNow
+                };
+                _dbContext.UserExercises.Add(exercise);
+            }
+
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
         catch (Exception ex)

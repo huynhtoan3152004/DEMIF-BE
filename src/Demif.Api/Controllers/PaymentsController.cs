@@ -1,23 +1,33 @@
+using Demif.Application.Features.Payments.GetHistory;
+using Demif.Application.Features.Payments.GetInfo;
+using Demif.Application.Features.Payments.GetStatus;
 using Demif.Application.Features.Payments.Webhook;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Demif.Api.Controllers;
 
 /// <summary>
-/// Payments — Webhook callbacks for payment providers
+/// Payments — Webhook callbacks + payment info/status for SEPay
 /// </summary>
 [Route("api/payments")]
 [ApiController]
 public class PaymentsController : ControllerBase
 {
     private readonly SePayWebhookService _sePayWebhookService;
+    private readonly GetPaymentInfoService _getPaymentInfoService;
+    private readonly GetPaymentStatusService _getPaymentStatusService;
     private readonly ILogger<PaymentsController> _logger;
 
     public PaymentsController(
         SePayWebhookService sePayWebhookService,
+        GetPaymentInfoService getPaymentInfoService,
+        GetPaymentStatusService getPaymentStatusService,
         ILogger<PaymentsController> logger)
     {
         _sePayWebhookService = sePayWebhookService;
+        _getPaymentInfoService = getPaymentInfoService;
+        _getPaymentStatusService = getPaymentStatusService;
         _logger = logger;
     }
 
@@ -45,6 +55,56 @@ public class PaymentsController : ControllerBase
                 Message = result.Error.Message
             });
         }
+
+        return Ok(result.Value);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Payment Info & Status (requires auth)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Lấy thông tin thanh toán SEPay: số TK, QR, nội dung CK.
+    /// FE dùng để hiển thị màn hình "Chờ thanh toán".
+    /// </summary>
+    [HttpGet("info/{referenceCode}")]
+    [Authorize]
+    [ProducesResponseType(typeof(GetPaymentInfoResponse), 200)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetPaymentInfo(
+        string referenceCode,
+        CancellationToken cancellationToken)
+    {
+        var result = await _getPaymentInfoService.ExecuteAsync(referenceCode, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Code switch
+            {
+                "NotFound" => NotFound(new { error = result.Error.Message }),
+                _ => BadRequest(new { error = result.Error.Message })
+            };
+        }
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Polling: kiểm tra trạng thái thanh toán.
+    /// FE gọi mỗi 3-5 giây cho đến khi IsCompleted = true.
+    /// </summary>
+    [HttpGet("{referenceCode}/status")]
+    [Authorize]
+    [ProducesResponseType(typeof(GetPaymentStatusResponse), 200)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetPaymentStatus(
+        string referenceCode,
+        CancellationToken cancellationToken)
+    {
+        var result = await _getPaymentStatusService.ExecuteAsync(referenceCode, cancellationToken);
+
+        if (result.IsFailure)
+            return NotFound(new { error = result.Error.Message });
 
         return Ok(result.Value);
     }

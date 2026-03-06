@@ -12,6 +12,9 @@ using Demif.Application.Features.Lessons.GetLessonById;
 using Demif.Application.Features.Lessons.GetLessonSegments;
 using Demif.Application.Features.Lessons.SubmitDictation;
 using Demif.Application.Features.Lessons.GetLessons;
+using Demif.Application.Features.Payments.GetHistory;
+using Demif.Application.Features.Payments.GetInfo;
+using Demif.Application.Features.Payments.GetStatus;
 using Demif.Application.Features.Payments.Webhook;
 using Demif.Application.Features.Profile.GetMyProfile;
 using Demif.Application.Features.Profile.UpdateMyProfile;
@@ -95,6 +98,9 @@ public static class DependencyInjection
 
         // Payment Services
         services.AddScoped<SePayWebhookService>();
+        services.AddScoped<GetPaymentInfoService>();
+        services.AddScoped<GetPaymentStatusService>();
+        services.AddScoped<GetPaymentHistoryService>();
 
         //Blog Services
         services.AddScoped<ICreateBlogService, CreateBlogService>();

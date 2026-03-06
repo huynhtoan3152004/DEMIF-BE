@@ -1,0 +1,759 @@
+{
+  "info": {
+    "name": "DEMIF — Lesson Full Flow (End-to-End)",
+    "_postman_id": "demif-lesson-full-flow-v2",
+    "description": "## Luồng test hoàn chỉnh: Register → Verify Email → Login → Import YouTube → Publish → Play → Check → Submit\n\n### ⚠️ Yêu cầu Password:\nPassword PHẢI thỏa mãn TẤT CẢ:\n- Ít nhất 6 ký tự\n- Có chữ HOA (A–Z)\n- Có chữ thường (a–z)\n- Có chữ số (0–9)\n\nVí dụ hợp lệ: `Abc123123` — `123123` hoặc `abc123` sẽ bị TỪ CHỐI.\n\n### Thứ tự chạy (theo folder):\n1. **Auth** → Register → (copy token từ email) → Verify Email → Login admin → Login user\n2. **Admin: Lesson Setup** → Preview YouTube → Create lesson → Publish\n3. **User: Browse** → Danh sách → Chi tiết\n4. **User: Dictation Exercise** → Segments → Exercise → Check × 2 (UPSERT) → Submit\n5. **User: Progress** → Activity → Progress → Streak → Subscription\n\n### Variables:\n- `verify_token` → set **THỦ CÔNG** sau khi nhận email\n- `admin_token`, `user_token`, `lesson_id` → auto-save\n\n### YouTube video:\nhttps://www.youtube.com/watch?v=arj7oStGLkU (TED Talk — có captions)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url",        "value": "http://localhost:5077",                   "type": "string" },
+    { "key": "admin_token",     "value": "",                                        "type": "string" },
+    { "key": "user_token",      "value": "",                                        "type": "string" },
+    { "key": "lesson_id",       "value": "",                                        "type": "string" },
+    { "key": "verify_token",    "value": "PASTE_TOKEN_FROM_EMAIL_HERE",              "type": "string",
+      "description": "Copy token từ link ?token=... trong email verify rồi dán vào đây trước khi chạy bước 1.2" },
+    { "key": "admin_email",     "value": "admin@demif.app",                         "type": "string" },
+    { "key": "admin_password",  "value": "Admin@123456",                            "type": "string" },
+    { "key": "user_email",      "value": "ninja31504@gmail.com",                    "type": "string" },
+    { "key": "user_password",   "value": "Abc123123",                              "type": "string",
+      "description": "PHẢI có chữ HOA + chữ thường + số. '123123' sẽ bị validator từ chối." },
+    { "key": "youtube_url",     "value": "https://www.youtube.com/watch?v=arj7oStGLkU", "type": "string" }
+  ],
+  "item": [
+
+    {
+      "name": "1. Auth — Register + Verify + Login",
+      "item": [
+
+        {
+          "name": "1.1 Register (POST /api/auth/register)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var code = pm.response.code;",
+                  "if (code === 200 || code === 201) {",
+                  "    var json = pm.response.json();",
+                  "    pm.test('✅ Register thành công', () => pm.expect(code).to.be.oneOf([200, 201]));",
+                  "    console.log('📧 Email:', json.email || pm.collectionVariables.get('user_email'));",
+                  "    console.log('👤 Username:', json.username);",
+                  "    console.log('📌 Message:', json.message);",
+                  "    console.log('');",
+                  "    console.log('⚡ BƯỚC TIẾP THEO:');",
+                  "    console.log('   1. Mở email: ninja31504@gmail.com');",
+                  "    console.log('   2. Click link verify hoặc copy token từ URL ?token=...');",
+                  "    console.log('   3. Dán token vào Collection Variable: verify_token');",
+                  "    console.log('   4. Chạy bước 1.2 Verify Email');",
+                  "} else if (code === 409) {",
+                  "    console.log('ℹ️ Email đã đăng ký → sang 1.2 Verify (nếu chưa verify) hoặc 1.3 Login Admin.');",
+                  "} else if (code === 400) {",
+                  "    console.error('❌ Validation lỗi:', JSON.stringify(pm.response.json()));",
+                  "    pm.test('❌ Register validation failed', () => { throw new Error(pm.response.text()); });",
+                  "} else {",
+                  "    pm.test('❌ Register error', () => { throw new Error(pm.response.text()); });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"username\": \"huynhtoan\",\n  \"password\": \"{{user_password}}\",\n  \"confirmPassword\": \"{{user_password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/auth/register", "host": ["{{base_url}}"], "path": ["api", "auth", "register"] }
+          }
+        },
+
+        {
+          "name": "1.2 Verify Email (GET /api/auth/verify-email) ⚠️ Set verify_token trước!",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "var token = pm.collectionVariables.get('verify_token');",
+                  "if (!token || token === 'PASTE_TOKEN_FROM_EMAIL_HERE') {",
+                  "    throw new Error('⛔ Chưa set verify_token! Hãy copy token từ email → dán vào Collection Variable \"verify_token\"');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Verify email OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "var token = json.accessToken || json.token || (json.data && json.data.accessToken);",
+                  "if (token) {",
+                  "    pm.collectionVariables.set('user_token', token);",
+                  "    console.log('✅ Email verified + user_token auto-saved (bỏ qua bước 1.4 nếu muốn).');",
+                  "    console.log('🔑 Token:', token.substring(0, 50) + '...');",
+                  "} else {",
+                  "    console.log('✅ Email verified. Không có inline token → chạy bước 1.4 Login User.');",
+                  "    console.log('Response:', JSON.stringify(json));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/verify-email?token={{verify_token}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "verify-email"],
+              "query": [{ "key": "token", "value": "{{verify_token}}" }]
+            }
+          }
+        },
+
+        {
+          "name": "1.3 Login Admin (POST /api/auth/login) → save admin_token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Admin login OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "var token = json.accessToken || json.token || (json.data && json.data.accessToken);",
+                  "if (token) {",
+                  "    pm.collectionVariables.set('admin_token', token);",
+                  "    console.log('✅ admin_token saved:', token.substring(0, 50) + '...');",
+                  "} else {",
+                  "    pm.test('❌ Không tìm thấy accessToken', () => { throw new Error(JSON.stringify(json)); });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+
+        {
+          "name": "1.4 Login User (POST /api/auth/login) → save user_token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ User login OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "var token = json.accessToken || json.token || (json.data && json.data.accessToken);",
+                  "if (token) {",
+                  "    pm.collectionVariables.set('user_token', token);",
+                  "    console.log('✅ user_token saved:', token.substring(0, 50) + '...');",
+                  "} else if (pm.response.code === 400) {",
+                  "    var err = (json.error || json.message || JSON.stringify(json)).toLowerCase();",
+                  "    if (err.includes('email') || err.includes('verify')) {",
+                  "        pm.test('❌ Email chưa được verify', () => { throw new Error('Hãy chạy bước 1.2 Verify Email trước!'); });",
+                  "    } else {",
+                  "        pm.test('❌ Login thất bại', () => { throw new Error(JSON.stringify(json)); });",
+                  "    }",
+                  "} else {",
+                  "    pm.test('❌ Không có token', () => { throw new Error(JSON.stringify(json)); });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+          }
+        }
+
+      ]
+    },
+
+    {
+      "name": "2. Admin: Lesson Setup",
+      "item": [
+
+        {
+          "name": "2.1 Preview YouTube Video",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Preview OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "pm.test('Video có captions', () => pm.expect(json.hasCaptions).to.be.true);",
+                  "console.log('📹 Video:', json.title);",
+                  "console.log('⏱  Duration:', json.durationSeconds, 's');",
+                  "console.log('📝 Has captions:', json.hasCaptions);",
+                  "console.log('🌐 Caption languages:', JSON.stringify(json.availableCaptionLanguages));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/youtube/preview?url={{youtube_url}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "youtube", "preview"],
+              "query": [{ "key": "url", "value": "{{youtube_url}}" }]
+            }
+          }
+        },
+
+        {
+          "name": "2.2 Create Lesson from YouTube → auto-save lesson_id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create lesson OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "pm.collectionVariables.set('lesson_id', json.lessonId);",
+                  "console.log('✅ lesson_id saved:', json.lessonId);",
+                  "console.log('📝 Title:', json.title);",
+                  "console.log('🎬 VideoId:', json.videoId);",
+                  "console.log('📊 Caption segments:', json.captionSegmentCount);",
+                  "console.log('📄 Transcript words:', json.transcriptWordCount);",
+                  "console.log('🎯 Has dictation templates:', json.hasDictationTemplates);",
+                  "if (!json.hasDictationTemplates) {",
+                  "    console.warn('⚠️  Chưa có DictationTemplates — sẽ regenerate ở bước 2.4');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"youTubeUrl\": \"{{youtube_url}}\",\n  \"captionLanguage\": \"en\",\n  \"lessonType\": 0,\n  \"level\": 1,\n  \"category\": \"education\",\n  \"isPremiumOnly\": false,\n  \"displayOrder\": 1,\n  \"status\": \"draft\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/admin/lessons/from-youtube", "host": ["{{base_url}}"], "path": ["api", "admin", "lessons", "from-youtube"] }
+          }
+        },
+
+        {
+          "name": "2.3 Get Admin Lesson Detail (kiểm tra transcripts)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get lesson detail OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "console.log('📌 Status:', json.status);",
+                  "console.log('📄 FullTranscript length:', json.fullTranscript ? json.fullTranscript.length : 0, 'chars');",
+                  "console.log('⏱  TimedTranscript exists:', !!json.timedTranscript);",
+                  "console.log('🎯 HasDictationTemplates:', json.hasDictationTemplates);",
+                  "pm.test('Có TimedTranscript', () => pm.expect(json.timedTranscript).to.not.be.null);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": { "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}", "host": ["{{base_url}}"], "path": ["api", "admin", "lessons", "{{lesson_id}}"] }
+          }
+        },
+
+        {
+          "name": "2.4 Regenerate Dictation Templates (nếu cần)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Regenerate OK', () => pm.response.to.have.status(200));",
+                  "console.log('✅ DictationTemplates đã được tạo lại cho tất cả levels');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": { "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}/regenerate-templates", "host": ["{{base_url}}"], "path": ["api", "admin", "lessons", "{{lesson_id}}", "regenerate-templates"] }
+          }
+        },
+
+        {
+          "name": "2.5 Publish Lesson",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Publish OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "console.log('✅ Lesson published. Status:', json.status || json.message || JSON.stringify(json));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"published\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}/status", "host": ["{{base_url}}"], "path": ["api", "admin", "lessons", "{{lesson_id}}", "status"] }
+          }
+        }
+
+      ]
+    },
+
+    {
+      "name": "3. User: Browse Lessons",
+      "item": [
+
+        {
+          "name": "3.1 Danh sách Lessons (public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get lessons OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "var lessons = json.items || json.lessons || json;",
+                  "var count = Array.isArray(lessons) ? lessons.length : (json.totalCount || 0);",
+                  "console.log('📚 Total lessons:', count);",
+                  "pm.test('Có ít nhất 1 lesson', () => pm.expect(count).to.be.greaterThan(0));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/lessons?page=1&pageSize=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lessons"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "10" }
+              ]
+            }
+          }
+        },
+
+        {
+          "name": "3.2 Chi tiết Lesson (user)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get lesson detail OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "console.log('📌 Title:', json.title);",
+                  "console.log('🎬 MediaType:', json.mediaType);",
+                  "console.log('🔗 MediaUrl:', json.mediaUrl || json.audioUrl);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{user_token}}" }],
+            "url": { "raw": "{{base_url}}/api/lessons/{{lesson_id}}", "host": ["{{base_url}}"], "path": ["api", "lessons", "{{lesson_id}}"] }
+          }
+        }
+
+      ]
+    },
+
+    {
+      "name": "4. User: Dictation Exercise",
+      "item": [
+
+        {
+          "name": "4.1 Lấy Segments (Beginner — hiện transcript)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get segments OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "var segs = json.segments || [];",
+                  "console.log('📊 Total segments:', segs.length);",
+                  "console.log('⚙️  LevelConfig:', JSON.stringify(json.levelConfig));",
+                  "if (segs.length > 0) {",
+                  "    console.log('🔎 Segment[0]:', JSON.stringify(segs[0]));",
+                  "    console.log('ℹ️  Text segment[0]:', segs[0].text || '(null — not Beginner level)');",
+                  "}",
+                  "pm.test('Có segments', () => pm.expect(segs.length).to.be.greaterThan(0));",
+                  "pm.test('Beginner: text không null', () => pm.expect(segs[0].text).to.be.a('string'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{user_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/lessons/{{lesson_id}}/segments?level=Beginner",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lessons", "{{lesson_id}}", "segments"],
+              "query": [{ "key": "level", "value": "Beginner" }]
+            }
+          }
+        },
+
+        {
+          "name": "4.2 Lấy Segments (Intermediate — ẩn transcript)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get segments intermediate OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "var segs = json.segments || [];",
+                  "console.log('📊 Segments:', segs.length);",
+                  "pm.test('Intermediate: text = null (ẩn transcript)', () => {",
+                  "    pm.expect(segs[0].text).to.be.null;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{user_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/lessons/{{lesson_id}}/segments?level=Intermediate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lessons", "{{lesson_id}}", "segments"],
+              "query": [{ "key": "level", "value": "Intermediate" }]
+            }
+          }
+        },
+
+        {
+          "name": "4.3 Lấy Dictation Exercise (blanks cho từng level)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get dictation OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "var segs = json.segments || [];",
+                  "console.log('📝 Dictation segments:', segs.length);",
+                  "if (segs.length > 0) {",
+                  "    console.log('🔎 Segment[0] blanks:', segs[0].blanks ? segs[0].blanks.length : 'N/A');",
+                  "    console.log('💬 Segment[0] text (với blanks):', segs[0].displayText || segs[0].text || JSON.stringify(segs[0]));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{user_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation?level=Intermediate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lessons", "{{lesson_id}}", "dictation"],
+              "query": [{ "key": "level", "value": "Intermediate" }]
+            }
+          }
+        },
+
+        {
+          "name": "4.4 Check Segment 0 — Lần 1 (gõ sai vài từ)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Check segment OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "console.log('🎯 Accuracy lần 1:', json.accuracy + '%');",
+                  "console.log('✅ Correct:', json.correctCount, '/', json.totalWords);",
+                  "console.log('❌ Wrong:', json.wrongCount);",
+                  "console.log('⏭️  Skipped:', json.skippedCount);",
+                  "console.log('📄 Transcript gốc:', json.transcript);",
+                  "console.log('🔤 Word results:', JSON.stringify(json.wordResults));",
+                  "pm.test('Trả về transcript', () => pm.expect(json.transcript).to.be.a('string').and.not.empty);",
+                  "pm.test('Có wordResults', () => pm.expect(json.wordResults.length).to.be.greaterThan(0));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"level\": \"Intermediate\",\n  \"userText\": \"how are you doing today\",\n  \"timeSpentSeconds\": 12\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/lessons/{{lesson_id}}/segments/0/check", "host": ["{{base_url}}"], "path": ["api", "lessons", "{{lesson_id}}", "segments", "0", "check"] }
+          }
+        },
+
+        {
+          "name": "4.5 Check Segment 0 — Lần 2 (test UPSERT: Attempts tăng, giữ BestScore)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Check segment lần 2 OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "console.log('🎯 Accuracy lần 2:', json.accuracy + '%');",
+                  "console.log('ℹ️  DB sẽ giữ BestScore và tăng Attempts = 2');",
+                  "pm.test('Accuracy hợp lệ', () => pm.expect(json.accuracy).to.be.within(0, 100));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"level\": \"Intermediate\",\n  \"userText\": \"how are you doing today my friend great to see you\",\n  \"timeSpentSeconds\": 18\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/lessons/{{lesson_id}}/segments/0/check", "host": ["{{base_url}}"], "path": ["api", "lessons", "{{lesson_id}}", "segments", "0", "check"] }
+          }
+        },
+
+        {
+          "name": "4.6 Check Segment 1 (segment tiếp theo)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Check segment 1 OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "console.log('🎯 Segment 1 accuracy:', json.accuracy + '%');",
+                  "console.log('📄 Transcript:', json.transcript);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"level\": \"Intermediate\",\n  \"userText\": \"\",\n  \"timeSpentSeconds\": 5\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/lessons/{{lesson_id}}/segments/1/check", "host": ["{{base_url}}"], "path": ["api", "lessons", "{{lesson_id}}", "segments", "1", "check"] }
+          }
+        },
+
+        {
+          "name": "4.7 Submit Dictation Toàn Bài",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Submit dictation OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "console.log('🏆 Final score:', json.score || json.totalScore || JSON.stringify(json));",
+                  "console.log('✅ Correct blanks:', json.correctBlanks, '/', json.totalBlanks);",
+                  "console.log('📊 Result details:', JSON.stringify(json.results || json).substring(0, 300));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"level\": \"Intermediate\",\n  \"answers\": {\n    \"0\": \"how are you doing today\",\n    \"1\": \"welcome everyone\",\n    \"2\": \"let us begin\"\n  },\n  \"timeSpentSeconds\": 120\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/lessons/{{lesson_id}}/dictation/submit", "host": ["{{base_url}}"], "path": ["api", "lessons", "{{lesson_id}}", "dictation", "submit"] }
+          }
+        }
+
+      ]
+    },
+
+    {
+      "name": "5. User: Progress Tracking",
+      "item": [
+
+        {
+          "name": "5.1 Record Activity (cộng điểm + update streak)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Record activity OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "console.log('🏅 Points earned:', json.pointsEarned);",
+                  "console.log('🔥 Streak:', json.currentStreak);",
+                  "console.log('📊 Total points:', json.totalPoints);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lessonId\": \"{{lesson_id}}\",\n  \"exerciseType\": \"Dictation\",\n  \"score\": 75,\n  \"timeSpentMinutes\": 5\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/me/activity", "host": ["{{base_url}}"], "path": ["api", "me", "activity"] }
+          }
+        },
+
+        {
+          "name": "5.2 Get My Progress",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get progress OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "console.log('📈 Total Points:', json.totalPoints);",
+                  "console.log('🎯 Level:', json.level);",
+                  "console.log('📚 Lessons Completed:', json.lessonsCompleted);",
+                  "console.log('📊 Avg Score:', json.avgScore);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{user_token}}" }],
+            "url": { "raw": "{{base_url}}/api/me/progress", "host": ["{{base_url}}"], "path": ["api", "me", "progress"] }
+          }
+        },
+
+        {
+          "name": "5.3 Get My Streak",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get streak OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "console.log('🔥 Current streak:', json.currentStreak, 'ngày');",
+                  "console.log('🏆 Longest streak:', json.longestStreak, 'ngày');",
+                  "console.log('❄️  Freezes available:', json.freezesAvailable);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{user_token}}" }],
+            "url": { "raw": "{{base_url}}/api/me/streak", "host": ["{{base_url}}"], "path": ["api", "me", "streak"] }
+          }
+        },
+
+        {
+          "name": "5.4 Get My Subscription",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get subscription OK', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "console.log('💳 Has active subscription:', json.hasActiveSubscription);",
+                  "if (json.subscription) {",
+                  "    console.log('📦 Plan:', json.subscription.planName);",
+                  "    console.log('⏳ Days remaining:', json.subscription.daysRemaining);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{user_token}}" }],
+            "url": { "raw": "{{base_url}}/api/me/subscription", "host": ["{{base_url}}"], "path": ["api", "me", "subscription"] }
+          }
+        }
+
+      ]
+    }
+
+  ]
+}
