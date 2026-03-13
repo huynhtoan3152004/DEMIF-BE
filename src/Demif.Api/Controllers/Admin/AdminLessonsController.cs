@@ -6,7 +6,23 @@ using Microsoft.AspNetCore.Mvc;
 namespace Demif.Api.Controllers.Admin;
 
 /// <summary>
-/// Admin — Lesson Management (CRUD, templates, YouTube import)
+/// Admin — Quản lý bài học (Lesson Management).
+/// 
+/// ╔══════════════════════════════════════════════════════════════════════╗
+/// ║  QUY TRÌNH TẠO BÀI (HYBRID WORKFLOW)                              ║
+/// ║                                                                    ║
+/// ║  Bước 1: Tạo bài nháp (draft)                                     ║
+/// ║    → POST /quick-create  (paste SRT/VTT + title)                   ║
+/// ║    → POST /from-youtube  (auto-fetch từ YouTube)                   ║
+/// ║                                                                    ║
+/// ║  Bước 2: Moderator chỉnh sửa lỗ hổng đục lỗ                      ║
+/// ║    → PUT  /{id}/dictation-templates  (FE gửi mảng custom)          ║
+/// ║    → POST /{id}/regenerate-templates (reset lại auto-generate)     ║
+/// ║                                                                    ║
+/// ║  Bước 3: Kiểm tra & Xuất bản                                      ║
+/// ║    → GET  /{id}/dictation-preview  (preview như User)              ║
+/// ║    → PATCH /{id}/status            (draft → published/archived)    ║
+/// ╚══════════════════════════════════════════════════════════════════════╝
 /// </summary>
 [Route("api/admin/lessons")]
 [ApiController]
@@ -27,21 +43,25 @@ public class AdminLessonsController : ControllerBase
         _transcriptService = transcriptService;
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // Lesson CRUD
-    // ═══════════════════════════════════════════════════════════════
+    // ╔══════════════════════════════════════════════════════════════════╗
+    // ║  SECTION 1: DANH SÁCH & CHI TIẾT (Read-Only)                   ║
+    // ╚══════════════════════════════════════════════════════════════════╝
 
     /// <summary>
-    /// List all lessons with pagination (no premium filter).
+    /// Lấy danh sách tất cả bài học (có phân trang, không lọc premium).
+    /// Dùng cho Admin Dashboard hiển thị toàn bộ bài học.
     /// </summary>
+    /// <param name="page">Trang hiện tại (mặc định 1)</param>
+    /// <param name="pageSize">Số bài mỗi trang (1-100, mặc định 10)</param>
+    /// <param name="status">Lọc theo trạng thái: draft, published, archived (tùy chọn)</param>
     [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string? status = null,
         CancellationToken cancellationToken = default)
     {
-        // Clamp để tránh query nguy hiểm
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
@@ -54,9 +74,12 @@ public class AdminLessonsController : ControllerBase
     }
 
     /// <summary>
-    /// Get lesson detail.
+    /// Lấy chi tiết một bài học theo ID (bao gồm cả Transcript, Templates...).
     /// </summary>
+    /// <param name="id">Lesson ID (GUID)</param>
     [HttpGet("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
     {
         var result = await _adminService.GetByIdAsync(id, cancellationToken);
@@ -73,71 +96,25 @@ public class AdminLessonsController : ControllerBase
         return Ok(result.Value);
     }
 
-    /// <summary>
-    /// Create a new lesson (auto-generates DictationTemplates from FullTranscript).
-    /// </summary>
-    [HttpPost]
-    public async Task<IActionResult> Create(
-        [FromBody] CreateUpdateLessonRequest request,
-        CancellationToken cancellationToken)
-    {
-        var result = await _adminService.CreateAsync(request, cancellationToken);
-
-        if (result.IsFailure)
-            return BadRequest(new { error = result.Error.Message });
-
-        return CreatedAtAction(nameof(GetById), new { id = result.Value }, new { id = result.Value });
-    }
+    // ╔══════════════════════════════════════════════════════════════════╗
+    // ║  SECTION 2: TẠO BÀI HỌC (Bước 1 — Khởi tạo Draft)            ║
+    // ║  Có 2 cách tạo: quick-create hoặc from-youtube                 ║
+    // ╚══════════════════════════════════════════════════════════════════╝
 
     /// <summary>
-    /// Update lesson (re-generates templates if transcript changed).
+    /// Tạo nhanh bài học — Admin/Mod paste SRT/VTT/plain transcript + thông tin cơ bản.
+    /// Backend auto-generate: TimedTranscript, FullTranscript, DictationTemplates (bản nháp).
+    /// Sau khi tạo, Moderator dùng PUT /{id}/dictation-templates để chỉnh sửa lỗ hổng.
+    /// 
+    /// Workflow: quick-create → chỉnh dictation-templates → preview → publish
     /// </summary>
-    [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Update(
-        Guid id,
-        [FromBody] CreateUpdateLessonRequest request,
-        CancellationToken cancellationToken)
-    {
-        var result = await _adminService.UpdateAsync(id, request, cancellationToken);
-
-        if (result.IsFailure)
-        {
-            return result.Error.Code switch
-            {
-                "NotFound" => NotFound(new { error = result.Error.Message }),
-                _ => BadRequest(new { error = result.Error.Message })
-            };
-        }
-
-        return NoContent();
-    }
-
-    /// <summary>
-    /// Delete lesson (soft delete — archived).
-    /// </summary>
-    [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
-    {
-        var result = await _adminService.DeleteAsync(id, cancellationToken);
-
-        if (result.IsFailure)
-        {
-            return result.Error.Code switch
-            {
-                "NotFound" => NotFound(new { error = result.Error.Message }),
-                _ => BadRequest(new { error = result.Error.Message })
-            };
-        }
-
-        return NoContent();
-    }
-
-    /// <summary>
-    /// Quick-create lesson — admin paste SRT/VTT/plain transcript + minimal metadata.
-    /// Backend auto-generates: TimedTranscript, FullTranscript, DictationTemplates.
-    /// POST /api/admin/lessons/quick-create
-    /// </summary>
+    /// <remarks>
+    /// Format hỗ trợ: "srt", "vtt", "plain".
+    /// Mặc định status = "draft". PATCH /status để publish khi sẵn sàng.
+    /// </remarks>
     [HttpPost("quick-create")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> QuickCreate(
         [FromBody] QuickCreateLessonRequest request,
         CancellationToken cancellationToken)
@@ -154,10 +131,75 @@ public class AdminLessonsController : ControllerBase
     }
 
     /// <summary>
-    /// Re-generate DictationTemplates for an existing lesson.
-    /// Useful for refreshing templates without changing lesson data.
+    /// Tạo bài học từ YouTube URL — Auto-fetch metadata + captions.
+    /// Backend tự lấy: tiêu đề, thumbnail, phụ đề, thời lượng.
+    /// Sau khi tạo, DictationTemplates được auto-generate cho 4 level.
+    /// 
+    /// ⚠️ Nếu video không có CC (phụ đề), Moderator cần dùng 
+    ///    PATCH /{id}/transcript để upload transcript thủ công sau.
+    /// </summary>
+    [HttpPost("from-youtube")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CreateFromYouTube(
+        [FromBody] CreateLessonFromYouTubeRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _youTubeService.CreateFromYouTubeAsync(request, cancellationToken);
+
+        if (result.IsFailure)
+            return BadRequest(new { error = result.Error.Message });
+
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = result.Value.LessonId },
+            result.Value);
+    }
+
+    // ╔══════════════════════════════════════════════════════════════════╗
+    // ║  SECTION 3: CHỈNH SỬA TEMPLATES & TRANSCRIPT (Bước 2)          ║
+    // ║  Moderator điều chỉnh lỗ hổng đục lỗ và nội dung transcript    ║
+    // ╚══════════════════════════════════════════════════════════════════╝
+
+    /// <summary>
+    /// Ghi đè mảng DictationTemplates bằng dữ liệu custom từ Frontend.
+    /// 
+    /// FE gửi toàn bộ mảng JSON chứa các lỗ hổng (isBlank=true) mà Mod đã chọn.
+    /// Backend lưu đè trực tiếp, KHÔNG chạy thuật toán đục lỗ tự động.
+    /// 
+    /// Quy trình Hybrid: Backend auto-gen bản nháp → Mod sửa lại → PUT endpoint này.
+    /// </summary>
+    /// <param name="id">Lesson ID</param>
+    /// <param name="request">JSON chứa mảng DictationTemplates đã custom</param>
+    [HttpPut("{id:guid}/dictation-templates")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UpdateDictationTemplates(
+        Guid id,
+        [FromBody] UpdateDictationTemplatesRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _adminService.UpdateDictationTemplatesAsync(id, request, cancellationToken);
+        if (result.IsFailure)
+        {
+            return result.Error.Code switch
+            {
+                "NotFound" => NotFound(new { error = result.Error.Message }),
+                _ => BadRequest(new { error = result.Error.Message })
+            };
+        }
+        return Ok(new { message = "Custom DictationTemplates updated successfully." });
+    }
+
+    /// <summary>
+    /// Re-generate DictationTemplates tự động (reset lại bản nháp được máy đục lỗ).
+    /// Dùng khi Moderator muốn bắt đầu lại từ đầu thay vì sửa bản cũ.
+    /// Sau khi gọi, dùng GET /{id}/dictation-preview để xem kết quả mới.
     /// </summary>
     [HttpPost("{id:guid}/regenerate-templates")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RegenerateTemplates(Guid id, CancellationToken cancellationToken)
     {
         var result = await _adminService.RegenerateTemplatesAsync(id, cancellationToken);
@@ -174,96 +216,17 @@ public class AdminLessonsController : ControllerBase
         return Ok(new { message = "DictationTemplates regenerated successfully." });
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // YouTube Integration Endpoints
-    // ═══════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Preview YouTube video before creating a lesson.
-    /// Check metadata and available captions.
-    /// </summary>
-    [HttpGet("youtube/preview")]
-    public async Task<IActionResult> YouTubePreview(
-        [FromQuery] string url,
-        CancellationToken cancellationToken)
-    {
-        var result = await _youTubeService.PreviewAsync(url, cancellationToken);
-
-        if (result.IsFailure)
-            return BadRequest(new { error = result.Error.Message });
-
-        return Ok(result.Value);
-    }
-
-    /// <summary>
-    /// Lấy transcript YouTube theo nhiều ngôn ngữ (không ghi DB).
-    /// Dùng để FE/Admin preview transcript trước khi import.
-    /// </summary>
-    [HttpGet("youtube/transcripts")]
-    public async Task<IActionResult> GetYouTubeTranscripts(
-        [FromQuery] string url,
-        [FromQuery] string preferredLanguage = "en",
-        [FromQuery] bool includeText = true,
-        CancellationToken cancellationToken = default)
-    {
-        var result = await _youTubeService.GetTranscriptsAsync(
-            url,
-            preferredLanguage,
-            includeText,
-            cancellationToken);
-
-        if (result.IsFailure)
-            return BadRequest(new { error = result.Error.Message });
-
-        return Ok(result.Value);
-    }
-
-    /// <summary>
-    /// Create lesson from YouTube URL.
-    /// Auto-fetches metadata + captions, generates DictationTemplates for 4 levels.
-    /// </summary>
-    [HttpPost("from-youtube")]
-    public async Task<IActionResult> CreateFromYouTube(
-        [FromBody] CreateLessonFromYouTubeRequest request,
-        CancellationToken cancellationToken)
-    {
-        var result = await _youTubeService.CreateFromYouTubeAsync(request, cancellationToken);
-
-        if (result.IsFailure)
-            return BadRequest(new { error = result.Error.Message });
-
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = result.Value.LessonId },
-            result.Value);
-    }
-
-    /// <summary>
-    /// Admin xem toàn bộ segments + đáp án (chưa xóa answers).
-    /// Kiểm tra tất cả segment có đúng với transcript chưa trước khi publish.
-    /// GET /api/admin/lessons/{id}/dictation-preview
-    /// </summary>
-    [HttpGet("{id:guid}/dictation-preview")]
-    public async Task<IActionResult> GetDictationPreview(Guid id, CancellationToken cancellationToken)
-    {
-        var result = await _transcriptService.GetDictationPreviewAsync(id, cancellationToken);
-
-        if (result.IsFailure)
-            return result.Error.Code switch
-            {
-                "NotFound" => NotFound(new { error = result.Error.Message }),
-                _ => BadRequest(new { error = result.Error.Message })
-            };
-
-        return Ok(result.Value);
-    }
-
     /// <summary>
     /// Upload / cập nhật transcript thủ công — hỗ trợ VTT, SRT, hoặc plain text.
     /// Dùng khi video không có caption hoặc caption YouTube bị sai chính tả.
-    /// PATCH /api/admin/lessons/{id}/transcript
+    /// 
+    /// ⚠️ Khi cập nhật transcript, DictationTemplates cũ sẽ bị RESET.
+    ///    Cần gọi lại PUT /{id}/dictation-templates hoặc POST /{id}/regenerate-templates.
     /// </summary>
     [HttpPatch("{id:guid}/transcript")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateTranscript(
         Guid id,
         [FromBody] UpdateTranscriptRequest request,
@@ -282,12 +245,45 @@ public class AdminLessonsController : ControllerBase
         return Ok(result.Value);
     }
 
+    // ╔══════════════════════════════════════════════════════════════════╗
+    // ║  SECTION 4: KIỂM TRA & XUẤT BẢN (Bước 3 — Preview & Publish)  ║
+    // ╚══════════════════════════════════════════════════════════════════╝
+
     /// <summary>
-    /// Thay đổi trạng thái: draft → published → archived.
-    /// Guard: không publish được nếu chưa có TimedTranscript.
-    /// PATCH /api/admin/lessons/{id}/status
+    /// Xem trước bài dictation với góc nhìn User (hiển thị đáp án).
+    /// Dùng để kiểm tra các lỗ hổng đục lỗ trước khi xuất bản.
+    /// Admin thấy toàn bộ segments + đáp án để đối chiếu với transcript.
     /// </summary>
+    [HttpGet("{id:guid}/dictation-preview")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetDictationPreview(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _transcriptService.GetDictationPreviewAsync(id, cancellationToken);
+
+        if (result.IsFailure)
+            return result.Error.Code switch
+            {
+                "NotFound" => NotFound(new { error = result.Error.Message }),
+                _ => BadRequest(new { error = result.Error.Message })
+            };
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Thay đổi trạng thái bài học: draft → published → archived.
+    /// 
+    /// Guard rules:
+    ///   - Không cho publish nếu chưa có TimedTranscript.
+    ///   - Không cho publish nếu chưa có DictationTemplates.
+    /// </summary>
+    /// <param name="id">Lesson ID</param>
+    /// <param name="request">Body chứa trường "status": "published" | "draft" | "archived"</param>
     [HttpPatch("{id:guid}/status")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateStatus(
         Guid id,
         [FromBody] UpdateLessonStatusRequest request,
@@ -305,4 +301,109 @@ public class AdminLessonsController : ControllerBase
 
         return Ok(result.Value);
     }
+
+    // ╔══════════════════════════════════════════════════════════════════╗
+    // ║  SECTION 5: QUẢN LÝ CHUNG (Delete, Update metadata)            ║
+    // ╚══════════════════════════════════════════════════════════════════╝
+
+    /// <summary>
+    /// Cập nhật metadata bài học (Tiêu đề, Level, Premium, Category...).
+    /// Nếu FullTranscript thay đổi, DictationTemplates sẽ được re-generate tự động.
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Update(
+        Guid id,
+        [FromBody] UpdateLessonMetadataRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _adminService.UpdateAsync(id, request, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Code switch
+            {
+                "NotFound" => NotFound(new { error = result.Error.Message }),
+                _ => BadRequest(new { error = result.Error.Message })
+            };
+        }
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Xóa bài học (soft delete — chuyển status sang "archived").
+    /// Bài học sẽ không hiển thị cho User nhưng vẫn còn trong Database.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _adminService.DeleteAsync(id, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Code switch
+            {
+                "NotFound" => NotFound(new { error = result.Error.Message }),
+                _ => BadRequest(new { error = result.Error.Message })
+            };
+        }
+
+        return NoContent();
+    }
+
+    // ╔══════════════════════════════════════════════════════════════════╗
+    // ║  SECTION 6: YOUTUBE PREVIEW (Hỗ trợ — không ghi DB)            ║
+    // ╚══════════════════════════════════════════════════════════════════╝
+
+    /// <summary>
+    /// Preview metadata YouTube video trước khi tạo bài.
+    /// Kiểm tra xem video có phụ đề (CC) hay không.
+    /// KHÔNG ghi vào Database — chỉ trả về dữ liệu để FE hiển thị.
+    /// </summary>
+    [HttpGet("youtube/preview")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> YouTubePreview(
+        [FromQuery] string url,
+        CancellationToken cancellationToken)
+    {
+        var result = await _youTubeService.PreviewAsync(url, cancellationToken);
+
+        if (result.IsFailure)
+            return BadRequest(new { error = result.Error.Message });
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Lấy transcript YouTube theo nhiều ngôn ngữ (không ghi DB).
+    /// Dùng để Admin preview transcript trước khi chọn import.
+    /// </summary>
+    [HttpGet("youtube/transcripts")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetYouTubeTranscripts(
+        [FromQuery] string url,
+        [FromQuery] string preferredLanguage = "en",
+        [FromQuery] bool includeText = true,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _youTubeService.GetTranscriptsAsync(
+            url,
+            preferredLanguage,
+            includeText,
+            cancellationToken);
+
+        if (result.IsFailure)
+            return BadRequest(new { error = result.Error.Message });
+
+        return Ok(result.Value);
+    }
+
+
 }

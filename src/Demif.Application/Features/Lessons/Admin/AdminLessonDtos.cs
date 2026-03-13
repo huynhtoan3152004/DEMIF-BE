@@ -3,9 +3,9 @@ using Demif.Domain.Enums;
 namespace Demif.Application.Features.Lessons.Admin;
 
 /// <summary>
-/// Request cho tạo/cập nhật lesson
+/// DTO để cập nhật thông tin chung của Lesson (không bao gồm Transcript hay Status)
 /// </summary>
-public class CreateUpdateLessonRequest
+public class UpdateLessonMetadataRequest
 {
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
@@ -15,25 +15,10 @@ public class CreateUpdateLessonRequest
     public string AudioUrl { get; set; } = string.Empty;
     public string? MediaUrl { get; set; }
     public string? MediaType { get; set; }
-    public int DurationSeconds { get; set; }
     public string? ThumbnailUrl { get; set; }
-    public string FullTranscript { get; set; } = string.Empty;
-
-    /// <summary>
-    /// JSON array timed segments (optional).
-    /// Nếu admin không cung cấp, backend sẽ auto-generate từ FullTranscript + DurationSeconds.
-    /// Format: [{"startTime": 0.0, "endTime": 2.5, "text": "Hello everyone"}]
-    /// </summary>
-    public string? TimedTranscript { get; set; }
-
     public bool IsPremiumOnly { get; set; }
     public int DisplayOrder { get; set; }
     public string? Tags { get; set; }
-    /// <summary>
-    /// Default là "draft" — admin phải chủ động PATCH /status = "published" sau khi đã có transcript.
-    /// Tránh lesson không có DictationTemplates bị publish tự động.
-    /// </summary>
-    public string Status { get; set; } = "draft";
 }
 
 /// <summary>
@@ -76,4 +61,17 @@ public class AdminLessonDto
     public decimal AvgScore { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+}
+
+/// <summary>
+/// Request for updating dictation templates manually.
+/// </summary>
+public class UpdateDictationTemplatesRequest
+{
+    /// <summary>
+    /// JSON array of custom dictation templates from the frontend.
+    /// This will overwrite the existing auto-generated templates.
+    /// Format: [{"level": "Beginner", "segments": [{"startTime": 0.0, "endTime": 2.5, "words": [{"text": "Hello", "isBlank": false, "position": 0}, {"text": "everyone", "isBlank": true, "answer": "everyone", "position": 1}]}]}]
+    /// </summary>
+    public string DictationTemplatesJson { get; set; } = string.Empty;
 }

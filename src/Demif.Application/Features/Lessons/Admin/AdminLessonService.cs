@@ -8,21 +8,28 @@ using Microsoft.Extensions.Logging;
 namespace Demif.Application.Features.Lessons.Admin;
 
 /// <summary>
-/// Admin Lesson Service - CRUD lessons
-/// Tích hợp DictationTemplateGenerator: auto-generate TimedTranscript + DictationTemplates
+/// Admin Lesson Service — CRUD + Hybrid Dictation Workflow.
+/// 
+/// Luồng chính (Hybrid):
+///   1. QuickCreateAsync / YouTubeLessonService → Tạo draft + auto-gen DictationTemplates
+///   2. UpdateDictationTemplatesAsync            → Mod sửa lỗ hổng thủ công từ FE
+///   3. RegenerateTemplatesAsync                 → Reset lại bản auto-gen nếu cần
+///   4. AdminTranscriptService.UpdateStatusAsync  → Publish khi sẵn sàng
+///   
+/// [OBSOLETE] CreateAsync / UpdateAsync: Luồng cũ (15+ fields JSON), giữ backward compat.
 /// </summary>
 public class AdminLessonService
 {
     private readonly ILessonRepository _lessonRepository;
     private readonly IApplicationDbContext _dbContext;
     private readonly ILogger<AdminLessonService> _logger;
-    private readonly IValidator<CreateUpdateLessonRequest> _validator;
+    private readonly IValidator<UpdateLessonMetadataRequest> _validator;
 
     public AdminLessonService(
         ILessonRepository lessonRepository,
         IApplicationDbContext dbContext,
         ILogger<AdminLessonService> logger,
-        IValidator<CreateUpdateLessonRequest> validator)
+        IValidator<UpdateLessonMetadataRequest> validator)
     {
         _lessonRepository = lessonRepository;
         _dbContext = dbContext;
@@ -70,49 +77,10 @@ public class AdminLessonService
     }
 
     /// <summary>
-    /// Tạo lesson mới — auto-generate TimedTranscript + DictationTemplates
+    /// Cập nhật thông tin cơ bản (Metadata) của lesson.
+    /// Không còn tự auto-generate Transcript hay Templates (đã tách riêng endpoint).
     /// </summary>
-    public async Task<Result<Guid>> CreateAsync(CreateUpdateLessonRequest request, CancellationToken cancellationToken = default)
-    {
-        var validation = await _validator.ValidateAsync(request, cancellationToken);
-        if (!validation.IsValid)
-        {
-            var errors = string.Join(" | ", validation.Errors.Select(e => e.ErrorMessage));
-            return Result.Failure<Guid>(Error.Validation(errors));
-        }
-        var lesson = new Lesson
-        {
-            Title = request.Title,
-            Description = request.Description,
-            LessonType = request.LessonType,
-            Level = request.Level,
-            Category = request.Category,
-            AudioUrl = request.AudioUrl,
-            MediaUrl = request.MediaUrl,
-            MediaType = request.MediaType,
-            DurationSeconds = request.DurationSeconds,
-            ThumbnailUrl = request.ThumbnailUrl,
-            FullTranscript = request.FullTranscript,
-            IsPremiumOnly = request.IsPremiumOnly,
-            DisplayOrder = request.DisplayOrder,
-            Tags = request.Tags,
-            Status = request.Status
-        };
-
-        // Auto-generate TimedTranscript + DictationTemplates
-        GenerateDictationData(lesson, request.TimedTranscript);
-
-        await _lessonRepository.AddAsync(lesson, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation("Created lesson '{Title}' (Id: {LessonId}) with DictationTemplates", lesson.Title, lesson.Id);
-        return Result.Success(lesson.Id);
-    }
-
-    /// <summary>
-    /// Cập nhật lesson — re-generate DictationTemplates nếu transcript thay đổi
-    /// </summary>
-    public async Task<Result> UpdateAsync(Guid id, CreateUpdateLessonRequest request, CancellationToken cancellationToken = default)
+    public async Task<Result> UpdateAsync(Guid id, UpdateLessonMetadataRequest request, CancellationToken cancellationToken = default)
     {
         var validation = await _validator.ValidateAsync(request, cancellationToken);
         if (!validation.IsValid)
@@ -126,9 +94,6 @@ public class AdminLessonService
             return Result.Failure(Error.NotFound("Không tìm thấy bài học."));
         }
 
-        var transcriptChanged = lesson.FullTranscript != request.FullTranscript
-                             || lesson.DurationSeconds != request.DurationSeconds;
-
         lesson.Title = request.Title;
         lesson.Description = request.Description;
         lesson.LessonType = request.LessonType;
@@ -137,21 +102,11 @@ public class AdminLessonService
         lesson.AudioUrl = request.AudioUrl;
         lesson.MediaUrl = request.MediaUrl;
         lesson.MediaType = request.MediaType;
-        lesson.DurationSeconds = request.DurationSeconds;
         lesson.ThumbnailUrl = request.ThumbnailUrl;
-        lesson.FullTranscript = request.FullTranscript;
         lesson.IsPremiumOnly = request.IsPremiumOnly;
         lesson.DisplayOrder = request.DisplayOrder;
         lesson.Tags = request.Tags;
-        lesson.Status = request.Status;
         lesson.UpdatedAt = DateTime.UtcNow;
-
-        // Re-generate nếu transcript/duration thay đổi hoặc admin cung cấp TimedTranscript mới
-        if (transcriptChanged || !string.IsNullOrWhiteSpace(request.TimedTranscript))
-        {
-            GenerateDictationData(lesson, request.TimedTranscript);
-            _logger.LogInformation("Re-generated DictationTemplates for lesson {LessonId}", id);
-        }
 
         await _lessonRepository.UpdateAsync(lesson, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -236,6 +191,39 @@ public class AdminLessonService
             _logger.LogWarning(ex, "Failed to generate DictationTemplates for lesson '{Title}'", lesson.Title);
             // Không throw — lesson vẫn tạo được, chỉ không có templates
         }
+    }
+
+    /// <summary>
+    /// Cho phép Moderator tự custom lại lỗ hổng (DictationTemplates)
+    /// Ghi đè trực tiếp cữ liệu nhận từ Frontend vào Database.
+    /// </summary>
+    public async Task<Result> UpdateDictationTemplatesAsync(
+        Guid id, UpdateDictationTemplatesRequest request, CancellationToken cancellationToken = default)
+    {
+        var lesson = await _lessonRepository.GetByIdAsync(id, cancellationToken);
+        if (lesson is null)
+            return Result.Failure(Error.NotFound("Bài học không tồn tại."));
+
+        if (string.IsNullOrWhiteSpace(request.DictationTemplatesJson))
+            return Result.Failure(Error.Validation("DictationTemplatesJson không được để trống."));
+
+        // Validate basic JSON structure (chỉ check xem có parse được không, FE chịu trách nhiệm schema)
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(request.DictationTemplatesJson);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return Result.Failure(Error.Validation("DictationTemplatesJson không phải là JSON hợp lệ."));
+        }
+
+        lesson.DictationTemplates = request.DictationTemplatesJson;
+
+        await _lessonRepository.UpdateAsync(lesson, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Moderator updated manually customized DictationTemplates for lesson {LessonId}", id);
+        return Result.Success();
     }
 
     /// <summary>

@@ -18,7 +18,7 @@ public class AdminLessonServiceTests
     private readonly Mock<ILessonRepository> _lessonRepoMock;
     private readonly Mock<IApplicationDbContext> _dbContextMock;
     private readonly Mock<ILogger<AdminLessonService>> _loggerMock;
-    private readonly Mock<IValidator<CreateUpdateLessonRequest>> _validatorMock;
+    private readonly Mock<IValidator<UpdateLessonMetadataRequest>> _validatorMock;
     private readonly AdminLessonService _service;
 
     public AdminLessonServiceTests()
@@ -26,11 +26,11 @@ public class AdminLessonServiceTests
         _lessonRepoMock = new Mock<ILessonRepository>();
         _dbContextMock = new Mock<IApplicationDbContext>();
         _loggerMock = new Mock<ILogger<AdminLessonService>>();
-        _validatorMock = new Mock<IValidator<CreateUpdateLessonRequest>>();
+        _validatorMock = new Mock<IValidator<UpdateLessonMetadataRequest>>();
 
         // Default: validation always passes
         _validatorMock
-            .Setup(v => v.ValidateAsync(It.IsAny<CreateUpdateLessonRequest>(), It.IsAny<CancellationToken>()))
+            .Setup(v => v.ValidateAsync(It.IsAny<UpdateLessonMetadataRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ValidationResult());
 
         _service = new AdminLessonService(
@@ -40,9 +40,9 @@ public class AdminLessonServiceTests
             _validatorMock.Object);
     }
 
-    private static CreateUpdateLessonRequest CreateValidRequest()
+    private static UpdateLessonMetadataRequest CreateValidRequest()
     {
-        return new CreateUpdateLessonRequest
+        return new UpdateLessonMetadataRequest
         {
             Title = "Business English: Meeting Vocabulary",
             Description = "Learn essential vocabulary for business meetings.",
@@ -50,145 +50,10 @@ public class AdminLessonServiceTests
             Level = Level.Beginner,
             Category = "business",
             AudioUrl = "https://storage.example.com/lessons/meeting-vocab.mp3",
-            DurationSeconds = 45,
-            FullTranscript = "Good morning everyone. Welcome to today's meeting. " +
-                "Let's start with the agenda. First, we will discuss the quarterly report. " +
-                "The sales team has achieved remarkable results. Revenue increased by twenty percent. " +
-                "Next, we need to address customer feedback. Several clients have requested new features. " +
-                "Finally, let's plan our strategy for next quarter. We should focus on innovation.",
             IsPremiumOnly = false,
-            Status = "published",
             Tags = "[\"business\", \"meeting\", \"vocabulary\"]"
         };
     }
-
-    #region Create Tests
-
-    [Fact]
-    public async Task CreateAsync_ValidRequest_ReturnsSuccess()
-    {
-        // Arrange
-        var request = CreateValidRequest();
-        _lessonRepoMock.Setup(r => r.AddAsync(It.IsAny<Lesson>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Lesson l, CancellationToken _) => l);
-        _dbContextMock.Setup(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
-
-        // Act
-        var result = await _service.CreateAsync(request);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotEqual(Guid.Empty, result.Value);
-    }
-
-    [Fact]
-    public async Task CreateAsync_WithTranscript_GeneratesTimedTranscript()
-    {
-        // Arrange
-        var request = CreateValidRequest();
-        Lesson? capturedLesson = null;
-        _lessonRepoMock.Setup(r => r.AddAsync(It.IsAny<Lesson>(), It.IsAny<CancellationToken>()))
-            .Callback<Lesson, CancellationToken>((lesson, _) => capturedLesson = lesson)
-            .ReturnsAsync((Lesson l, CancellationToken _) => l);
-        _dbContextMock.Setup(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
-
-        // Act
-        await _service.CreateAsync(request);
-
-        // Assert
-        Assert.NotNull(capturedLesson);
-        Assert.NotNull(capturedLesson!.TimedTranscript);
-        Assert.Contains("startTime", capturedLesson.TimedTranscript);
-    }
-
-    [Fact]
-    public async Task CreateAsync_WithTranscript_GeneratesDictationTemplates()
-    {
-        // Arrange
-        var request = CreateValidRequest();
-        Lesson? capturedLesson = null;
-        _lessonRepoMock.Setup(r => r.AddAsync(It.IsAny<Lesson>(), It.IsAny<CancellationToken>()))
-            .Callback<Lesson, CancellationToken>((lesson, _) => capturedLesson = lesson)
-            .ReturnsAsync((Lesson l, CancellationToken _) => l);
-        _dbContextMock.Setup(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
-
-        // Act
-        await _service.CreateAsync(request);
-
-        // Assert — DictationTemplates chứa 4 levels
-        Assert.NotNull(capturedLesson);
-        Assert.NotNull(capturedLesson!.DictationTemplates);
-        Assert.Contains("Beginner", capturedLesson.DictationTemplates);
-        Assert.Contains("Expert", capturedLesson.DictationTemplates);
-    }
-
-    [Fact]
-    public async Task CreateAsync_EmptyTranscript_NoTemplatesGenerated()
-    {
-        // Arrange
-        var request = CreateValidRequest();
-        request.FullTranscript = "";
-        Lesson? capturedLesson = null;
-        _lessonRepoMock.Setup(r => r.AddAsync(It.IsAny<Lesson>(), It.IsAny<CancellationToken>()))
-            .Callback<Lesson, CancellationToken>((lesson, _) => capturedLesson = lesson)
-            .ReturnsAsync((Lesson l, CancellationToken _) => l);
-        _dbContextMock.Setup(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
-
-        // Act
-        await _service.CreateAsync(request);
-
-        // Assert — Không có transcript thì không generate templates
-        Assert.NotNull(capturedLesson);
-        Assert.Null(capturedLesson!.DictationTemplates);
-    }
-
-    [Fact]
-    public async Task CreateAsync_WithCustomTimedTranscript_UsesProvidedData()
-    {
-        // Arrange — Admin cung cấp TimedTranscript sẵn (VD: từ YouTube VTT)
-        var request = CreateValidRequest();
-        request.TimedTranscript = "[{\"startTime\":0,\"endTime\":5,\"text\":\"Custom segment from VTT\"}]";
-        Lesson? capturedLesson = null;
-        _lessonRepoMock.Setup(r => r.AddAsync(It.IsAny<Lesson>(), It.IsAny<CancellationToken>()))
-            .Callback<Lesson, CancellationToken>((lesson, _) => capturedLesson = lesson)
-            .ReturnsAsync((Lesson l, CancellationToken _) => l);
-        _dbContextMock.Setup(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
-
-        // Act
-        await _service.CreateAsync(request);
-
-        // Assert — Dùng TimedTranscript admin cung cấp, không auto-generate
-        Assert.NotNull(capturedLesson);
-        Assert.Contains("Custom segment from VTT", capturedLesson!.TimedTranscript!);
-    }
-
-    [Fact]
-    public async Task CreateAsync_PremiumLesson_SetsPremiumFlag()
-    {
-        // Arrange
-        var request = CreateValidRequest();
-        request.IsPremiumOnly = true;
-        Lesson? capturedLesson = null;
-        _lessonRepoMock.Setup(r => r.AddAsync(It.IsAny<Lesson>(), It.IsAny<CancellationToken>()))
-            .Callback<Lesson, CancellationToken>((lesson, _) => capturedLesson = lesson)
-            .ReturnsAsync((Lesson l, CancellationToken _) => l);
-        _dbContextMock.Setup(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
-
-        // Act
-        await _service.CreateAsync(request);
-
-        // Assert
-        Assert.NotNull(capturedLesson);
-        Assert.True(capturedLesson!.IsPremiumOnly);
-    }
-
-    #endregion
 
     #region GetById Tests
 
@@ -283,38 +148,7 @@ public class AdminLessonServiceTests
         Assert.Equal("NotFound", result.Error.Code);
     }
 
-    [Fact]
-    public async Task UpdateAsync_TranscriptChanged_RegeneratesTemplates()
-    {
-        // Arrange
-        var lessonId = Guid.NewGuid();
-        var lesson = new Lesson
-        {
-            Id = lessonId,
-            Title = "Test",
-            FullTranscript = "Old transcript.",
-            DurationSeconds = 10,
-            AudioUrl = "https://example.com/audio.mp3",
-            Status = "published"
-        };
-        _lessonRepoMock.Setup(r => r.GetByIdAsync(lessonId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(lesson);
-        _lessonRepoMock.Setup(r => r.UpdateAsync(It.IsAny<Lesson>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        _dbContextMock.Setup(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
 
-        var request = CreateValidRequest();
-        request.FullTranscript = "New transcript. This is completely different.";
-
-        // Act
-        var result = await _service.UpdateAsync(lessonId, request);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(lesson.DictationTemplates);
-        Assert.Contains("Beginner", lesson.DictationTemplates);
-    }
 
     #endregion
 
