@@ -1,4 +1,5 @@
 using Demif.Application.Features.Lessons.CheckSegment;
+using Demif.Application.Features.Lessons.CheckShadowing;
 using Demif.Application.Features.Lessons.GetDictationExercise;
 using Demif.Application.Features.Lessons.GetLessonById;
 using Demif.Application.Features.Lessons.GetLessons;
@@ -23,6 +24,7 @@ public class LessonsController : ControllerBase
     private readonly SubmitDictationService _submitDictationService;
     private readonly GetLessonSegmentsService _getSegmentsService;
     private readonly CheckSegmentService _checkSegmentService;
+    private readonly CheckShadowingService _checkShadowingService;
 
     public LessonsController(
         GetLessonsService getLessonsService,
@@ -30,7 +32,8 @@ public class LessonsController : ControllerBase
         GetDictationExerciseService getDictationExerciseService,
         SubmitDictationService submitDictationService,
         GetLessonSegmentsService getSegmentsService,
-        CheckSegmentService checkSegmentService)
+        CheckSegmentService checkSegmentService,
+        CheckShadowingService checkShadowingService)
     {
         _getLessonsService = getLessonsService;
         _getLessonByIdService = getLessonByIdService;
@@ -38,6 +41,7 @@ public class LessonsController : ControllerBase
         _submitDictationService = submitDictationService;
         _getSegmentsService = getSegmentsService;
         _checkSegmentService = checkSegmentService;
+        _checkShadowingService = checkShadowingService;
     }
 
     /// <summary>
@@ -198,6 +202,36 @@ public class LessonsController : ControllerBase
     {
         var userId = GetUserIdOrNull()!.Value;
         var result = await _checkSegmentService.ExecuteAsync(id, segmentIndex, request, userId, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Code switch
+            {
+                "NotFound"   => NotFound(new { error = result.Error.Message }),
+                "Validation" => BadRequest(new { error = result.Error.Message }),
+                _            => BadRequest(new { error = result.Error.Message })
+            };
+        }
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Shadowing check — text-fallback mode (browser Web Speech API).
+    /// FE records audio → Web Speech API transcribes → sends UserText.
+    /// Backend runs LCS diff vs transcript and returns word-level feedback.
+    /// POST /api/lessons/{id}/segments/{segmentIndex}/shadowing
+    /// </summary>
+    [HttpPost("{id:guid}/segments/{segmentIndex:int}/shadowing")]
+    [Authorize]
+    public async Task<IActionResult> CheckShadowing(
+        Guid id,
+        int segmentIndex,
+        [FromBody] CheckShadowingRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetUserIdOrNull()!.Value;
+        var result = await _checkShadowingService.ExecuteAsync(id, segmentIndex, request, userId, cancellationToken);
 
         if (result.IsFailure)
         {

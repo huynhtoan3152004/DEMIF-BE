@@ -81,7 +81,7 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
     public async Task<(IEnumerable<Lesson> Items, int TotalCount)> GetForUserAsync(
         int page,
         int pageSize,
-        bool hasPremiumAccess,
+        bool isLoggedIn,
         Level? level = null,
         LessonType? type = null,
         string? category = null,
@@ -89,8 +89,8 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
     {
         var query = _dbSet.Where(l => l.Status == "published");
 
-        // Nếu user không có premium, filter bỏ premium lessons
-        if (!hasPremiumAccess)
+        // Guest = chỉ free lessons. Login user = full catalog (FE tự xử lý lock/redirect)
+        if (!isLoggedIn)
             query = query.Where(l => !l.IsPremiumOnly);
 
         if (level.HasValue)

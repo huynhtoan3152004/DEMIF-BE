@@ -26,8 +26,16 @@ public class SubmitDictationServiceTests
         _dbContextMock = new Mock<IApplicationDbContext>();
         _loggerMock = new Mock<ILogger<SubmitDictationService>>();
 
-        // Mock UserExercises DbSet
+        // Mock UserExercises DbSet with async support for FirstOrDefaultAsync (UPSERT pattern)
+        var exerciseData = new List<UserExercise>().AsQueryable();
         var mockSet = new Mock<DbSet<UserExercise>>();
+        mockSet.As<IQueryable<UserExercise>>().Setup(m => m.Provider).Returns(new TestAsyncQueryProvider<UserExercise>(exerciseData.Provider));
+        mockSet.As<IQueryable<UserExercise>>().Setup(m => m.Expression).Returns(exerciseData.Expression);
+        mockSet.As<IQueryable<UserExercise>>().Setup(m => m.ElementType).Returns(exerciseData.ElementType);
+        mockSet.As<IQueryable<UserExercise>>().Setup(m => m.GetEnumerator()).Returns(exerciseData.GetEnumerator());
+        mockSet.As<IAsyncEnumerable<UserExercise>>().Setup(m => m.GetAsyncEnumerator(It.IsAny<CancellationToken>()))
+            .Returns(new TestAsyncEnumerator<UserExercise>(exerciseData.GetEnumerator()));
+
         _dbContextMock.Setup(d => d.UserExercises).Returns(mockSet.Object);
         _dbContextMock.Setup(d => d.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 

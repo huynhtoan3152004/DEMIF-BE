@@ -133,6 +133,27 @@ public class AdminLessonsController : ControllerBase
     }
 
     /// <summary>
+    /// Quick-create lesson — admin paste SRT/VTT/plain transcript + minimal metadata.
+    /// Backend auto-generates: TimedTranscript, FullTranscript, DictationTemplates.
+    /// POST /api/admin/lessons/quick-create
+    /// </summary>
+    [HttpPost("quick-create")]
+    public async Task<IActionResult> QuickCreate(
+        [FromBody] QuickCreateLessonRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _adminService.QuickCreateAsync(request, cancellationToken);
+
+        if (result.IsFailure)
+            return BadRequest(new { error = result.Error.Message });
+
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = result.Value.LessonId },
+            result.Value);
+    }
+
+    /// <summary>
     /// Re-generate DictationTemplates for an existing lesson.
     /// Useful for refreshing templates without changing lesson data.
     /// </summary>

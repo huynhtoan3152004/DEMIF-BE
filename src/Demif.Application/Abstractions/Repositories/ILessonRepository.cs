@@ -26,12 +26,12 @@ public interface ILessonRepository : IGenericRepository<Lesson>
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Lấy lessons cho user (lọc premium nếu user không có subscription)
+    /// Lấy lessons cho user. Login = full catalog, Guest = free only.
     /// </summary>
     Task<(IEnumerable<Lesson> Items, int TotalCount)> GetForUserAsync(
         int page,
         int pageSize,
-        bool hasPremiumAccess,
+        bool isLoggedIn,
         Level? level = null,
         LessonType? type = null,
         string? category = null,

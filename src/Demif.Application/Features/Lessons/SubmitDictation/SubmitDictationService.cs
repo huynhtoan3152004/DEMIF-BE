@@ -114,28 +114,54 @@ public class SubmitDictationService
             ? (decimal)correctCount / totalBlanks * 100
             : 0;
 
-        // 6. Lưu kết quả vào UserExercise
-        var exercise = new UserExercise
+        // 6. Lưu kết quả vào UserExercise — UPSERT pattern (tránh lỗi 500 khi submit lại)
+        var userInputJson = JsonSerializer.Serialize(request.Answers, new JsonSerializerOptions
         {
-            UserId = userId,
-            LessonId = lessonId,
-            ExerciseType = Domain.Enums.ExerciseType.Dictation,
-            // Lưu user answers vào UserInput
-            UserInput = JsonSerializer.Serialize(request.Answers, new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            }),
-            // Lưu chi tiết kết quả
-            ResultDetails = JsonSerializer.Serialize(results, new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            }),
-            Score = (int)Math.Round(score),
-            TimeSpentSeconds = request.TimeSpentSeconds,
-            CompletedAt = DateTime.UtcNow
-        };
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+        var resultDetailsJson = JsonSerializer.Serialize(results, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+        var newScore = (int)Math.Round(score);
 
-        _dbContext.UserExercises.Add(exercise);
+        // Tìm existing exercise cho cùng user + lesson + Dictation (toàn bài, SegmentIndex == null)
+        var existing = await _dbContext.UserExercises
+            .FirstOrDefaultAsync(
+                e => e.UserId == userId
+                  && e.LessonId == lessonId
+                  && e.ExerciseType == ExerciseType.Dictation
+                  && e.SegmentIndex == null,
+                cancellationToken);
+
+        UserExercise exercise;
+        if (existing is not null)
+        {
+            existing.Attempts++;
+            existing.Score = Math.Max(existing.Score, newScore);
+            existing.UserInput = userInputJson;
+            existing.ResultDetails = resultDetailsJson;
+            existing.TimeSpentSeconds = request.TimeSpentSeconds;
+            existing.CompletedAt = DateTime.UtcNow;
+            _dbContext.UserExercises.Update(existing);
+            exercise = existing;
+        }
+        else
+        {
+            exercise = new UserExercise
+            {
+                UserId = userId,
+                LessonId = lessonId,
+                ExerciseType = ExerciseType.Dictation,
+                UserInput = userInputJson,
+                ResultDetails = resultDetailsJson,
+                Score = newScore,
+                TimeSpentSeconds = request.TimeSpentSeconds,
+                CompletedAt = DateTime.UtcNow
+            };
+            _dbContext.UserExercises.Add(exercise);
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         // Update denormalized stats on Lesson

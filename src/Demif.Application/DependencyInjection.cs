@@ -7,6 +7,7 @@ using Demif.Application.Features.Auth.RefreshToken;
 using Demif.Application.Features.Auth.Register;
 using Demif.Application.Features.Lessons.Admin;
 using Demif.Application.Features.Lessons.CheckSegment;
+using Demif.Application.Features.Lessons.CheckShadowing;
 using Demif.Application.Features.Lessons.GetDictationExercise;
 using Demif.Application.Features.Lessons.GetLessonById;
 using Demif.Application.Features.Lessons.GetLessonSegments;
@@ -94,6 +95,7 @@ public static class DependencyInjection
         services.AddScoped<YouTubeLessonService>();
         services.AddScoped<GetLessonSegmentsService>();
         services.AddScoped<CheckSegmentService>();
+        services.AddScoped<CheckShadowingService>();
         services.AddScoped<AdminTranscriptService>();
 
         // Payment Services

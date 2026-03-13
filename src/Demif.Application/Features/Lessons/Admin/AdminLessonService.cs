@@ -238,6 +238,115 @@ public class AdminLessonService
         }
     }
 
+    /// <summary>
+    /// Quick-create lesson — admin chỉ cần Title + paste SRT/VTT/plain transcript.
+    /// Backend auto-generate: TimedTranscript, FullTranscript, DictationTemplates, DurationSeconds.
+    /// Status mặc định = "draft" để admin review trước khi publish.
+    /// </summary>
+    public async Task<Result<QuickCreateLessonResponse>> QuickCreateAsync(
+        QuickCreateLessonRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Title))
+            return Result.Failure<QuickCreateLessonResponse>(Error.Validation("Title không được để trống."));
+
+        if (string.IsNullOrWhiteSpace(request.Transcript))
+            return Result.Failure<QuickCreateLessonResponse>(Error.Validation("Transcript không được để trống."));
+
+        // Parse transcript theo format
+        List<TimedSegment> segments;
+        try
+        {
+            segments = request.Format.ToLowerInvariant() switch
+            {
+                "vtt" => AdminTranscriptService.ParseVtt(request.Transcript),
+                "srt" => AdminTranscriptService.ParseSrt(request.Transcript),
+                "plain" => AdminTranscriptService.GenerateFromPlain(
+                    request.Transcript, request.DurationSeconds ?? 60),
+                _ => throw new ArgumentException(
+                    $"Format '{request.Format}' không hợp lệ. Dùng: srt, vtt, plain")
+            };
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<QuickCreateLessonResponse>(
+                Error.Validation($"Không thể parse transcript: {ex.Message}"));
+        }
+
+        if (segments.Count == 0)
+            return Result.Failure<QuickCreateLessonResponse>(
+                Error.Validation("Transcript không chứa segment nào. Kiểm tra lại format."));
+
+        var timedTranscriptJson = System.Text.Json.JsonSerializer.Serialize(segments,
+            new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+        var fullTranscript = string.Join(" ", segments.Select(s => s.Text));
+        var duration = request.DurationSeconds
+            ?? (int)Math.Ceiling(segments.Max(s => s.EndTime));
+
+        // Auto-detect mediaType từ URL
+        var mediaType = request.MediaType;
+        if (string.IsNullOrWhiteSpace(mediaType) && !string.IsNullOrWhiteSpace(request.MediaUrl))
+        {
+            mediaType = request.MediaUrl.Contains("youtube.com") || request.MediaUrl.Contains("youtu.be")
+                ? "youtube" : "audio";
+        }
+
+        var lesson = new Lesson
+        {
+            Title = request.Title,
+            Description = request.Description,
+            LessonType = request.LessonType,
+            Level = request.Level,
+            Category = request.Category,
+            AudioUrl = request.MediaUrl ?? string.Empty,
+            MediaUrl = request.MediaUrl,
+            MediaType = mediaType,
+            DurationSeconds = duration,
+            ThumbnailUrl = request.ThumbnailUrl,
+            FullTranscript = fullTranscript,
+            TimedTranscript = timedTranscriptJson,
+            IsPremiumOnly = request.IsPremiumOnly,
+            DisplayOrder = request.DisplayOrder,
+            Tags = request.Tags,
+            Status = "draft"
+        };
+
+        // Auto-generate DictationTemplates cho 4 levels
+        var hasTemplates = false;
+        try
+        {
+            lesson.DictationTemplates = DictationTemplateGenerator.GenerateAllTemplates(timedTranscriptJson);
+            hasTemplates = !string.IsNullOrWhiteSpace(lesson.DictationTemplates);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to generate DictationTemplates for quick-create '{Title}'", request.Title);
+        }
+
+        await _lessonRepository.AddAsync(lesson, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var wordCount = segments.Sum(s =>
+            s.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length);
+
+        _logger.LogInformation(
+            "Quick-created lesson '{Title}' (Id: {LessonId}): {Segments} segments, {Words} words, templates={HasTemplates}",
+            lesson.Title, lesson.Id, segments.Count, wordCount, hasTemplates);
+
+        return Result.Success(new QuickCreateLessonResponse
+        {
+            LessonId = lesson.Id,
+            Title = lesson.Title,
+            Status = lesson.Status,
+            SegmentCount = segments.Count,
+            WordCount = wordCount,
+            DurationSeconds = duration,
+            HasDictationTemplates = hasTemplates,
+            Message = $"✅ Tạo bài '{lesson.Title}' thành công: {segments.Count} segments, {wordCount} từ."
+                      + (hasTemplates ? " Đã generate DictationTemplates cho 4 levels." : "")
+                      + " Status = draft → PATCH /status = published khi sẵn sàng."
+        });
+    }
+
     private static AdminLessonDto MapToDto(Lesson lesson)
     {
         var mediaType = lesson.MediaType;

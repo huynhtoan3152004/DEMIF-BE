@@ -1,5 +1,6 @@
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Common.Models;
+using Demif.Domain.Enums;
 
 namespace Demif.Application.Features.Lessons.GetLessons;
 
@@ -9,35 +10,29 @@ namespace Demif.Application.Features.Lessons.GetLessons;
 public class GetLessonsService
 {
     private readonly ILessonRepository _lessonRepository;
-    private readonly IUserSubscriptionRepository _subscriptionRepository;
 
-    public GetLessonsService(
-        ILessonRepository lessonRepository,
-        IUserSubscriptionRepository subscriptionRepository)
+    public GetLessonsService(ILessonRepository lessonRepository)
     {
         _lessonRepository = lessonRepository;
-        _subscriptionRepository = subscriptionRepository;
     }
 
     /// <summary>
-    /// Lấy lessons cho user (có kiểm tra premium access)
+    /// Lấy lessons cho user.
+    /// Login user → thấy TẤT CẢ bài published (free + premium). FE tự xử lý lock/redirect.
+    /// Guest → chỉ thấy bài free.
     /// </summary>
     public async Task<Result<GetLessonsResponse>> ExecuteAsync(
         GetLessonsRequest request,
         Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        // Kiểm tra user có premium access không
-        var hasPremiumAccess = false;
-        if (userId.HasValue)
-        {
-            hasPremiumAccess = await _subscriptionRepository.HasActiveSubscriptionAsync(userId.Value, cancellationToken);
-        }
+        // Login user = full catalog, Guest = free only
+        var isLoggedIn = userId.HasValue;
 
         var (items, totalCount) = await _lessonRepository.GetForUserAsync(
             request.Page,
             request.PageSize,
-            hasPremiumAccess,
+            isLoggedIn,
             request.Level,
             request.Type,
             request.Category,
