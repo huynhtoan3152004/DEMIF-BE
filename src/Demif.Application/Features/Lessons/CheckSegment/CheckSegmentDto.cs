@@ -64,3 +64,56 @@ public class CheckSegmentResponse
     /// </summary>
     public List<WordCheckResult> WordResults { get; set; } = new();
 }
+
+/// <summary>
+/// Request check voice segment: browser gửi text đã nhận diện từ giọng nói.
+/// FE có thể dùng Web Speech API rồi post kết quả lên endpoint này.
+/// </summary>
+public class CheckVoiceSegmentRequest
+{
+    /// <summary>
+    /// Level đang làm bài.
+    /// </summary>
+    public string Level { get; set; } = "Intermediate";
+
+    /// <summary>
+    /// Text đã nhận diện từ giọng nói ở browser (speech-to-text result).
+    /// </summary>
+    public string SpokenText { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Confidence do browser STT trả về (0-1), optional.
+    /// </summary>
+    public double? SpeechConfidence { get; set; }
+
+    /// <summary>
+    /// Thời gian nói (giây), optional.
+    /// </summary>
+    public int? TimeSpentSeconds { get; set; }
+}
+
+/// <summary>
+/// Response check voice segment.
+/// </summary>
+public class CheckVoiceSegmentResponse : CheckSegmentResponse
+{
+    /// <summary>
+    /// Text đã nhận diện từ giọng nói.
+    /// </summary>
+    public string SpokenText { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Confidence do browser STT gửi lên.
+    /// </summary>
+    public double? SpeechConfidence { get; set; }
+
+    /// <summary>
+    /// Ngưỡng pass cho luyện nói theo segment (mặc định 80%).
+    /// </summary>
+    public double PassThreshold { get; set; } = 80;
+
+    /// <summary>
+    /// Kết quả đạt/chưa đạt theo pass threshold.
+    /// </summary>
+    public bool IsPassed { get; set; }
+}

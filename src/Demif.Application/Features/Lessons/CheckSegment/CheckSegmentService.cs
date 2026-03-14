@@ -30,6 +30,8 @@ public class CheckSegmentService
         PropertyNameCaseInsensitive = true
     };
 
+    private const double VoicePassThreshold = 80.0;
+
     public CheckSegmentService(
         ILessonRepository lessonRepository,
         IApplicationDbContext dbContext,
@@ -103,6 +105,57 @@ public class CheckSegmentService
             SkippedCount = skippedCount,
             Transcript = segment.Text,       // Luôn trả — học từ lỗi
             WordResults = wordResults
+        });
+    }
+
+    /// <summary>
+    /// Check segment bằng spoken text (đầu vào từ browser speech recognition).
+    /// Reuse toàn bộ logic so sánh transcript hiện có.
+    /// </summary>
+    public async Task<Result<CheckVoiceSegmentResponse>> ExecuteVoiceAsync(
+        Guid lessonId,
+        int segmentIndex,
+        CheckVoiceSegmentRequest request,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.SpokenText))
+            return Result.Failure<CheckVoiceSegmentResponse>(
+                Error.Validation("SpokenText không được để trống."));
+
+        var textRequest = new CheckSegmentRequest
+        {
+            Level = request.Level,
+            UserText = request.SpokenText,
+            TimeSpentSeconds = request.TimeSpentSeconds
+        };
+
+        var textResult = await ExecuteAsync(
+            lessonId,
+            segmentIndex,
+            textRequest,
+            userId,
+            cancellationToken);
+
+        if (textResult.IsFailure)
+            return Result.Failure<CheckVoiceSegmentResponse>(textResult.Error);
+
+        var payload = textResult.Value;
+
+        return Result.Success(new CheckVoiceSegmentResponse
+        {
+            SegmentIndex = payload.SegmentIndex,
+            Accuracy = payload.Accuracy,
+            CorrectCount = payload.CorrectCount,
+            TotalWords = payload.TotalWords,
+            WrongCount = payload.WrongCount,
+            SkippedCount = payload.SkippedCount,
+            Transcript = payload.Transcript,
+            WordResults = payload.WordResults,
+            SpokenText = request.SpokenText,
+            SpeechConfidence = request.SpeechConfidence,
+            PassThreshold = VoicePassThreshold,
+            IsPassed = payload.Accuracy >= VoicePassThreshold
         });
     }
 

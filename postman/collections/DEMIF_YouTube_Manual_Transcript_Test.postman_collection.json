@@ -1,0 +1,335 @@
+{
+  "info": {
+    "name": "DEMIF — YouTube Manual Transcript Test Flow",
+    "_postman_id": "demif-youtube-manual-transcript-test-v1",
+    "description": "Flow test: Admin login -> Create lesson from YouTube -> Upload manual VTT transcript -> Publish -> User login -> Browse -> Segments -> Check segment",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:5077", "type": "string" },
+    { "key": "admin_email", "value": "admin@demif.com", "type": "string" },
+    { "key": "admin_password", "value": "Admin@123456", "type": "string" },
+    { "key": "user_email", "value": "haile170504@gmail.com", "type": "string" },
+    { "key": "user_password", "value": "Abc123123", "type": "string" },
+    { "key": "youtube_url", "value": "https://www.youtube.com/watch?v=PssKpzB0Ah0&feature=youtu.be", "type": "string" },
+    { "key": "admin_token", "value": "", "type": "string" },
+    { "key": "user_token", "value": "", "type": "string" },
+    { "key": "lesson_id", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1) Admin Setup",
+      "item": [
+        {
+          "name": "1.1 Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Admin login OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const token = json.accessToken || json.token || (json.data && json.data.accessToken);",
+                  "pm.expect(token).to.be.a('string').and.not.empty;",
+                  "pm.collectionVariables.set('admin_token', token);",
+                  "console.log('admin_token saved');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "1.2 Create Lesson from YouTube (draft)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Create lesson OK', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "const json = pm.response.json();",
+                  "pm.expect(json.lessonId).to.be.a('string').and.not.empty;",
+                  "pm.collectionVariables.set('lesson_id', json.lessonId);",
+                  "console.log('lesson_id:', json.lessonId);",
+                  "console.log('hasCaptions:', json.hasCaptions);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"youTubeUrl\": \"{{youtube_url}}\",\n  \"captionLanguage\": \"en\",\n  \"lessonType\": 0,\n  \"level\": 1,\n  \"category\": \"education\",\n  \"isPremiumOnly\": false,\n  \"displayOrder\": 99,\n  \"status\": \"draft\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/from-youtube",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "from-youtube"]
+            }
+          }
+        },
+        {
+          "name": "1.3 Upload Manual Transcript (VTT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Upload transcript OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "console.log('segmentCount:', json.segmentCount);",
+                  "console.log('wordCount:', json.wordCount);",
+                  "console.log('templatesRegenerated:', json.dictationTemplatesRegenerated);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"vtt\",\n  \"rawContent\": \"WEBVTT\\n\\n00:00:05.547 --> 00:00:10.093\\nAt long last,\\n\\n00:00:10.093 --> 00:00:24.191\\nwe can begin.\\n\\n00:00:24.191 --> 00:00:26.401\\nWe're really starting to lose it.\\n\\n00:00:26.401 --> 00:00:29.446\\nBeing stuck in here.\\n\\n00:00:29.446 --> 00:00:32.824\\nNo end in sight.\\n\\n00:00:32.824 --> 00:00:36.787\\nMaybe tonight is our break.\\n\\n00:00:36.787 --> 00:00:38.539\\nWe find Vecna.\\n\\n00:00:38.539 --> 00:00:40.374\\nAnd we end this once and for all.\\n\\n00:00:40.374 --> 00:00:52.427\\nTogether.\\n\\n00:00:52.427 --> 00:00:56.598\\nThis isn't like one of your campaigns.\\n\\n00:00:56.598 --> 00:00:59.184\\nYou don't get to write the ending.\\n\\n00:00:59.184 --> 00:01:03.605\\nNot this time.\\n\\n00:01:03.605 --> 00:01:07.526\\nHe's planning to end our world.\\n\\n00:01:07.526 --> 00:01:09.695\\nAnd he's not gonna stop\\n\\n00:01:09.695 --> 00:01:44.479\\nuntil we're drained of every last ounce of suffering.\\n\\n00:01:44.479 --> 00:01:47.858\\nWe stay true to ourselves.\\n\\n00:01:47.858 --> 00:01:49.776\\nWe stay true to our friends.\\n\\n00:01:49.776 --> 00:01:53.614\\nDo it.\\n\\n00:01:53.614 --> 00:01:58.076\\nNo matter the cost.\\n\\n00:01:58.076 --> 00:02:10.505\\nLook out!\\n\\n00:02:10.505 --> 00:02:13.258\\nWilliam,\\n\\n00:02:13.258 --> 00:02:21.099\\nyou are going to help me…\\n\\n00:02:21.099 --> 00:02:24.000\\none last time.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}/transcript",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "{{lesson_id}}", "transcript"]
+            }
+          }
+        },
+        {
+          "name": "1.4 Publish Lesson",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Publish lesson OK', () => pm.response.to.have.status(200));",
+                  "console.log('Published lesson:', pm.collectionVariables.get('lesson_id'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"published\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/lessons/{{lesson_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "lessons", "{{lesson_id}}", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2) User Learning Flow",
+      "item": [
+        {
+          "name": "2.1 Login User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('User login OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const token = json.accessToken || json.token || (json.data && json.data.accessToken);",
+                  "pm.expect(token).to.be.a('string').and.not.empty;",
+                  "pm.collectionVariables.set('user_token', token);",
+                  "console.log('user_token saved');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "2.2 Get Lesson Detail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get lesson detail OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "console.log('title:', json.title);",
+                  "console.log('mediaType:', json.mediaType);",
+                  "console.log('mediaUrl:', json.mediaUrl || json.audioUrl);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/lessons/{{lesson_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lessons", "{{lesson_id}}"]
+            }
+          }
+        },
+        {
+          "name": "2.3 Get Segments (Intermediate)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get segments OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.expect(json.segments).to.be.an('array');",
+                  "pm.expect(json.segments.length).to.be.greaterThan(0);",
+                  "console.log('segments:', json.segments.length);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/lessons/{{lesson_id}}/segments?level=Intermediate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lessons", "{{lesson_id}}", "segments"],
+              "query": [
+                { "key": "level", "value": "Intermediate" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.4 Check Segment 0",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Check segment OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "console.log('accuracy:', json.accuracy);",
+                  "console.log('correct/total:', json.correctCount, '/', json.totalWords);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"level\": \"Intermediate\",\n  \"userText\": \"At long last we can begin\",\n  \"timeSpentSeconds\": 12\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/lessons/{{lesson_id}}/segments/0/check",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lessons", "{{lesson_id}}", "segments", "0", "check"]
+            }
+          }
+        },
+        {
+          "name": "2.5 Check Voice Segment 0 (browser STT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Check voice segment OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "console.log('accuracy:', json.accuracy);",
+                  "console.log('isPassed:', json.isPassed, 'threshold:', json.passThreshold);",
+                  "console.log('spokenText:', json.spokenText);",
+                  "console.log('transcript:', json.transcript);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"level\": \"Intermediate\",\n  \"spokenText\": \"At long last we can begin\",\n  \"speechConfidence\": 0.92,\n  \"timeSpentSeconds\": 8\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/lessons/{{lesson_id}}/segments/0/check-voice",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lessons", "{{lesson_id}}", "segments", "0", "check-voice"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
