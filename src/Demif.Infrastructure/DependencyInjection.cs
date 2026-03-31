@@ -40,6 +40,7 @@ public static class DependencyInjection
         services.AddScoped<IBlogRepository, BlogRepository>();
         services.AddScoped<IUserProgressRepository, UserProgressRepository>();
         services.AddScoped<IUserStreakRepository, UserStreakRepository>();
+        services.AddScoped<IUserAnalyticsRepository, UserAnalyticsRepository>();
 
         // Services
         services.AddScoped<IJwtTokenService, JwtTokenService>();

@@ -19,6 +19,7 @@ public interface IApplicationDbContext
     DbSet<UserRole> UserRoles { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<Blog> Blogs { get; }
+    DbSet<UserAnalytics> UserAnalytics { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

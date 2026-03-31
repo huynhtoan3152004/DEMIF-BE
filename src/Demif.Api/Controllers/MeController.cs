@@ -2,6 +2,7 @@ using Demif.Application.Abstractions.Services;
 using Demif.Application.Features.Me.GetProgress;
 using Demif.Application.Features.Me.GetStreak;
 using Demif.Application.Features.Me.RecordActivity;
+using Demif.Application.Features.Me.GetUserAnalytics;
 using Demif.Application.Features.Payments.GetHistory;
 using Demif.Application.Features.Subscriptions.GetMySubscription;
 using Demif.Api.Contracts;
@@ -27,6 +28,7 @@ public class MeController : ControllerBase
     private readonly GetMySubscriptionService _getMySubscriptionService;
     private readonly GetPaymentHistoryService _getPaymentHistoryService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly GetUserAnalyticsService _getUserAnalyticsService;
 
     public MeController(
         GetProgressService getProgressService,
@@ -34,7 +36,8 @@ public class MeController : ControllerBase
         RecordActivityService recordActivityService,
         GetMySubscriptionService getMySubscriptionService,
         GetPaymentHistoryService getPaymentHistoryService,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        GetUserAnalyticsService getUserAnalyticsService)
     {
         _getProgressService = getProgressService;
         _getStreakService = getStreakService;
@@ -42,6 +45,7 @@ public class MeController : ControllerBase
         _getMySubscriptionService = getMySubscriptionService;
         _getPaymentHistoryService = getPaymentHistoryService;
         _currentUserService = currentUserService;
+        _getUserAnalyticsService = getUserAnalyticsService;
     }
 
     /// <summary>
@@ -129,5 +133,85 @@ public class MeController : ControllerBase
             return BadRequest(new { error = result.Error.Code, message = result.Error.Message });
 
         return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Get an overview of my learning analytics (points, streaks, completions).
+    /// </summary>
+    [HttpGet("analytics/overview")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAnalyticsOverview(CancellationToken ct)
+    {
+        if (_currentUserService.UserId is not { } userId)
+            return Unauthorized();
+
+        var analytics = await _getUserAnalyticsService.GetAnalyticsAsync(userId, ct);
+        if (analytics == null)
+            return NotFound(new { message = "Analytics data not found." });
+
+        return Ok(new
+        {
+            analytics.TotalExercisesCompleted,
+            analytics.TotalLessonsCompleted,
+            analytics.TotalLearningMinutes,
+            analytics.TotalPoints,
+            analytics.CurrentStreak,
+            analytics.LongestStreak,
+            analytics.TotalActiveDays,
+            analytics.EngagementScore,
+            analytics.UpdatedAt
+        });
+    }
+
+    /// <summary>
+    /// Get my skills and category logic breakdown.
+    /// </summary>
+    [HttpGet("analytics/skills")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAnalyticsSkills(CancellationToken ct)
+    {
+        if (_currentUserService.UserId is not { } userId)
+            return Unauthorized();
+
+        var analytics = await _getUserAnalyticsService.GetAnalyticsAsync(userId, ct);
+        if (analytics == null)
+            return NotFound(new { message = "Analytics data not found." });
+
+        return Ok(new
+        {
+            analytics.AvgDictationScore,
+            analytics.AvgShadowingScore,
+            analytics.HighestScore,
+            analytics.PerfectScoresCount,
+            SkillsBreakdown = analytics.SkillsBreakdown != null ? System.Text.Json.JsonDocument.Parse(analytics.SkillsBreakdown) : null,
+            LessonTypeStats = analytics.LessonTypeStats != null ? System.Text.Json.JsonDocument.Parse(analytics.LessonTypeStats) : null,
+            LevelStats = analytics.LevelStats != null ? System.Text.Json.JsonDocument.Parse(analytics.LevelStats) : null,
+            CategoryStats = analytics.CategoryStats != null ? System.Text.Json.JsonDocument.Parse(analytics.CategoryStats) : null
+        });
+    }
+
+    /// <summary>
+    /// Get my recent trends, weekly/monthly improvements.
+    /// </summary>
+    [HttpGet("analytics/trends")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAnalyticsTrends(CancellationToken ct)
+    {
+        if (_currentUserService.UserId is not { } userId)
+            return Unauthorized();
+
+        var analytics = await _getUserAnalyticsService.GetAnalyticsAsync(userId, ct);
+        if (analytics == null)
+            return NotFound(new { message = "Analytics data not found." });
+
+        return Ok(new
+        {
+            analytics.WeeklyImprovement,
+            analytics.MonthlyImprovement,
+            WeeklyTrends = analytics.WeeklyTrends != null ? System.Text.Json.JsonDocument.Parse(analytics.WeeklyTrends) : null,
+            MonthlyTrends = analytics.MonthlyTrends != null ? System.Text.Json.JsonDocument.Parse(analytics.MonthlyTrends) : null,
+            TopLessons = analytics.TopLessons != null ? System.Text.Json.JsonDocument.Parse(analytics.TopLessons) : null,
+            RecentLessons = analytics.RecentLessons != null ? System.Text.Json.JsonDocument.Parse(analytics.RecentLessons) : null
+        });
     }
 }

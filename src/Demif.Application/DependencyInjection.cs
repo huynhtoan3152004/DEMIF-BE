@@ -40,6 +40,7 @@ using Demif.Application.Features.Blogs.DeleteBlog;
 using Demif.Application.Features.Me.GetProgress;
 using Demif.Application.Features.Me.GetStreak;
 using Demif.Application.Features.Me.RecordActivity;
+using Demif.Application.Features.Me.GetUserAnalytics;
 using Demif.Application.Features.Admin.UserSubscriptions;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -111,10 +112,11 @@ public static class DependencyInjection
         services.AddScoped<IUpdateBlogService, UpdateBlogService>();
         services.AddScoped<IDeleteBlogService, DeleteBlogService>();
 
-        // Me / Progress / Streak
+        // Me / Progress / Streak / Analytics
         services.AddScoped<GetProgressService>();
         services.AddScoped<GetStreakService>();
         services.AddScoped<RecordActivityService>();
+        services.AddScoped<GetUserAnalyticsService>();
 
         // Admin User Subscriptions
         services.AddScoped<AdminUserSubscriptionService>();
