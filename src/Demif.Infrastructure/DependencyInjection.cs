@@ -61,6 +61,23 @@ public static class DependencyInjection
         // HttpContextAccessor (for CurrentUserService)
         services.AddHttpContextAccessor();
 
+        // Caching (Redis or Memory fallback)
+        var redisConnection = configuration.GetConnectionString("Redis");
+        if (!string.IsNullOrEmpty(redisConnection))
+        {
+            services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = redisConnection;
+                options.InstanceName = "Demif_";
+            });
+        }
+        else
+        {
+            services.AddDistributedMemoryCache();
+        }
+        
+        services.AddSingleton<ICacheService, RedisCacheService>();
+
         // JWT Authentication
         var jwtKey = configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

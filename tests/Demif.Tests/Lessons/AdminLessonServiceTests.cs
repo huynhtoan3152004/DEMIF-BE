@@ -7,6 +7,7 @@ using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Demif.Application.Abstractions.Services;
 
 namespace Demif.Tests.Lessons;
 
@@ -19,6 +20,7 @@ public class AdminLessonServiceTests
     private readonly Mock<IApplicationDbContext> _dbContextMock;
     private readonly Mock<ILogger<AdminLessonService>> _loggerMock;
     private readonly Mock<IValidator<UpdateLessonMetadataRequest>> _validatorMock;
+    private readonly Mock<ICacheService> _cacheMock;
     private readonly AdminLessonService _service;
 
     public AdminLessonServiceTests()
@@ -27,6 +29,7 @@ public class AdminLessonServiceTests
         _dbContextMock = new Mock<IApplicationDbContext>();
         _loggerMock = new Mock<ILogger<AdminLessonService>>();
         _validatorMock = new Mock<IValidator<UpdateLessonMetadataRequest>>();
+        _cacheMock = new Mock<ICacheService>();
 
         // Default: validation always passes
         _validatorMock
@@ -37,7 +40,8 @@ public class AdminLessonServiceTests
             _lessonRepoMock.Object,
             _dbContextMock.Object,
             _loggerMock.Object,
-            _validatorMock.Object);
+            _validatorMock.Object,
+            _cacheMock.Object);
     }
 
     private static UpdateLessonMetadataRequest CreateValidRequest()

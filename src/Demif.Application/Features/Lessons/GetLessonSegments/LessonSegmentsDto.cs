@@ -72,6 +72,7 @@ public class LessonSegmentsResponse
     public string? MediaType { get; set; }
     public int DurationSeconds { get; set; }
     public string? ThumbnailUrl { get; set; }
+    public bool IsPremiumOnly { get; set; }
 
     /// <summary>
     /// Config cho level đã chọn — FE dùng để render UI phù hợp

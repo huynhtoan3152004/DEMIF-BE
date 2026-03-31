@@ -2,6 +2,7 @@ using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Features.Lessons;
 using Demif.Application.Features.Lessons.Admin;
+using Demif.Application.Abstractions.Services;
 using Demif.Application.Features.Lessons.CheckSegment;
 using Demif.Application.Features.Lessons.GetLessonSegments;
 using Demif.Domain.Entities;
@@ -373,7 +374,12 @@ public class GetLessonSegmentsServiceTests
         subRepo.Setup(r => r.HasActiveSubscriptionAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(true);
 
-        return new GetLessonSegmentsService(lessonRepo.Object, subRepo.Object);
+        var cacheMock = new Mock<ICacheService>();
+        cacheMock.Setup(c => c.GetOrCreateAsync(It.IsAny<string>(), It.IsAny<Func<CancellationToken, Task<LessonSegmentsResponse?>>>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
+                 .Returns<string, Func<CancellationToken, Task<LessonSegmentsResponse?>>, TimeSpan?, CancellationToken>(
+                     async (k, f, t, ct) => await f(ct));
+
+        return new GetLessonSegmentsService(lessonRepo.Object, subRepo.Object, cacheMock.Object);
     }
 
     [Fact]
@@ -427,7 +433,7 @@ public class GetLessonSegmentsServiceTests
                   .ReturnsAsync(lesson);
 
         var service = new GetLessonSegmentsService(
-            lessonRepo.Object, Mock.Of<IUserSubscriptionRepository>());
+            lessonRepo.Object, Mock.Of<IUserSubscriptionRepository>(), Mock.Of<ICacheService>());
 
         var result = await service.ExecuteAsync(lesson.Id, "Beginner");
 
@@ -496,7 +502,9 @@ public class AdminTranscriptServiceTests
         var dbMock = new Mock<IApplicationDbContext>();
         dbMock.Setup(d => d.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-        return new AdminTranscriptService(lessonRepo.Object, dbMock.Object);
+        var cacheMock = new Mock<ICacheService>();
+
+        return new AdminTranscriptService(lessonRepo.Object, dbMock.Object, cacheMock.Object);
     }
 
     [Fact]

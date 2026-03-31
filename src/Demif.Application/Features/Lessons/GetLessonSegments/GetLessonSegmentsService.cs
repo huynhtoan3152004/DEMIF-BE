@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Demif.Application.Abstractions.Repositories;
+using Demif.Application.Abstractions.Services;
 using Demif.Application.Common.Models;
 using Demif.Domain.Enums;
 
@@ -14,6 +15,7 @@ public class GetLessonSegmentsService
 {
     private readonly ILessonRepository _lessonRepository;
     private readonly IUserSubscriptionRepository _subscriptionRepository;
+    private readonly ICacheService _cacheService;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -59,10 +61,12 @@ public class GetLessonSegmentsService
 
     public GetLessonSegmentsService(
         ILessonRepository lessonRepository,
-        IUserSubscriptionRepository subscriptionRepository)
+        IUserSubscriptionRepository subscriptionRepository,
+        ICacheService cacheService)
     {
         _lessonRepository = lessonRepository;
         _subscriptionRepository = subscriptionRepository;
+        _cacheService = cacheService;
     }
 
     public async Task<Result<LessonSegmentsResponse>> ExecuteAsync(
@@ -76,13 +80,76 @@ public class GetLessonSegmentsService
             return Result.Failure<LessonSegmentsResponse>(
                 Error.Validation($"Level '{levelStr}' không hợp lệ. Dùng: Beginner, Intermediate, Advanced, Expert."));
 
-        // Load lesson
-        var lesson = await _lessonRepository.GetByIdAsync(lessonId, cancellationToken);
-        if (lesson is null || lesson.Status != "published")
-            return Result.Failure<LessonSegmentsResponse>(Error.NotFound("Không tìm thấy bài học."));
+        var cacheKey = $"lesson:{lessonId}:segments:level_{level}";
+
+        var response = await _cacheService.GetOrCreateAsync(cacheKey, async (ct) =>
+        {
+            // Load lesson
+            var lesson = await _lessonRepository.GetByIdAsync(lessonId, ct);
+            if (lesson is null || lesson.Status != "published")
+                return null;
+
+            // Phải có TimedTranscript — đây là nguồn segments chính xác
+            if (string.IsNullOrWhiteSpace(lesson.TimedTranscript))
+                throw new InvalidOperationException("Missing TimedTranscript");
+
+            // Parse segments từ TimedTranscript JSON
+            List<TimedSegment>? segments;
+            try
+            {
+                segments = JsonSerializer.Deserialize<List<TimedSegment>>(lesson.TimedTranscript, JsonOptions);
+            }
+            catch
+            {
+                throw new InvalidOperationException("Invalid JSON");
+            }
+
+            if (segments is null || segments.Count == 0)
+                throw new InvalidOperationException("No segments");
+
+            var config = Configs[level];
+
+            var segmentDtos = segments.Select((seg, index) => new LessonSegmentDto
+            {
+                Index = index,
+                StartTime = seg.StartTime,
+                EndTime = seg.EndTime,
+                WordCount = CountWords(seg.Text),
+                // Chỉ trả text nếu level Beginner (ShowTranscriptBefore = true)
+                Text = config.ShowTranscriptBefore ? seg.Text : null
+            }).ToList();
+
+            return new LessonSegmentsResponse
+            {
+                LessonId = lesson.Id,
+                Title = lesson.Title,
+                Description = lesson.Description,
+                AudioUrl = lesson.MediaUrl ?? lesson.AudioUrl,
+                MediaType = lesson.MediaType ?? "audio",
+                DurationSeconds = lesson.DurationSeconds,
+                ThumbnailUrl = lesson.ThumbnailUrl,
+                IsPremiumOnly = lesson.IsPremiumOnly,
+                LevelConfig = config,
+                Segments = segmentDtos,
+                TotalSegments = segmentDtos.Count
+            };
+        }, TimeSpan.FromDays(1), cancellationToken);
+
+        if (response is null)
+        {
+            // Re-check why it's null by looking at DB (fallback error messages)
+            var lesson = await _lessonRepository.GetByIdAsync(lessonId, cancellationToken);
+            if (lesson is null || lesson.Status != "published")
+                return Result.Failure<LessonSegmentsResponse>(Error.NotFound("Không tìm thấy bài học."));
+
+            if (string.IsNullOrWhiteSpace(lesson.TimedTranscript))
+                return Result.Failure<LessonSegmentsResponse>(Error.NotFound("Bài học chưa có Timed Transcript. Vui lòng liên hệ admin."));
+
+            return Result.Failure<LessonSegmentsResponse>(Error.Validation("Dữ liệu transcript không hợp lệ. Vui lòng liên hệ admin."));
+        }
 
         // Premium check
-        if (lesson.IsPremiumOnly)
+        if (response.IsPremiumOnly)
         {
             if (!userId.HasValue)
                 return Result.Failure<LessonSegmentsResponse>(
@@ -94,52 +161,7 @@ public class GetLessonSegmentsService
                     Error.Forbidden("Bài học này chỉ dành cho Premium. Vui lòng nâng cấp tài khoản."));
         }
 
-        // Phải có TimedTranscript — đây là nguồn segments chính xác
-        if (string.IsNullOrWhiteSpace(lesson.TimedTranscript))
-            return Result.Failure<LessonSegmentsResponse>(
-                Error.NotFound("Bài học chưa có Timed Transcript. Vui lòng liên hệ admin."));
-
-        // Parse segments từ TimedTranscript JSON
-        List<TimedSegment>? segments;
-        try
-        {
-            segments = JsonSerializer.Deserialize<List<TimedSegment>>(lesson.TimedTranscript, JsonOptions);
-        }
-        catch
-        {
-            return Result.Failure<LessonSegmentsResponse>(
-                Error.Validation("Dữ liệu transcript không hợp lệ. Vui lòng liên hệ admin."));
-        }
-
-        if (segments is null || segments.Count == 0)
-            return Result.Failure<LessonSegmentsResponse>(
-                Error.NotFound("Bài học chưa có segments. Vui lòng liên hệ admin."));
-
-        var config = Configs[level];
-
-        var segmentDtos = segments.Select((seg, index) => new LessonSegmentDto
-        {
-            Index = index,
-            StartTime = seg.StartTime,
-            EndTime = seg.EndTime,
-            WordCount = CountWords(seg.Text),
-            // Chỉ trả text nếu level Beginner (ShowTranscriptBefore = true)
-            Text = config.ShowTranscriptBefore ? seg.Text : null
-        }).ToList();
-
-        return Result.Success(new LessonSegmentsResponse
-        {
-            LessonId = lesson.Id,
-            Title = lesson.Title,
-            Description = lesson.Description,
-            AudioUrl = lesson.MediaUrl ?? lesson.AudioUrl,
-            MediaType = lesson.MediaType ?? "audio",
-            DurationSeconds = lesson.DurationSeconds,
-            ThumbnailUrl = lesson.ThumbnailUrl,
-            LevelConfig = config,
-            Segments = segmentDtos,
-            TotalSegments = segmentDtos.Count
-        });
+        return Result.Success(response);
     }
 
     private static int CountWords(string text)

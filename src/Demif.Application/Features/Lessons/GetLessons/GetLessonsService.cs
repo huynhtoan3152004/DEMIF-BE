@@ -1,4 +1,5 @@
 using Demif.Application.Abstractions.Repositories;
+using Demif.Application.Abstractions.Services;
 using Demif.Application.Common.Models;
 using Demif.Domain.Enums;
 
@@ -10,10 +11,12 @@ namespace Demif.Application.Features.Lessons.GetLessons;
 public class GetLessonsService
 {
     private readonly ILessonRepository _lessonRepository;
+    private readonly ICacheService _cacheService;
 
-    public GetLessonsService(ILessonRepository lessonRepository)
+    public GetLessonsService(ILessonRepository lessonRepository, ICacheService cacheService)
     {
         _lessonRepository = lessonRepository;
+        _cacheService = cacheService;
     }
 
     /// <summary>
@@ -29,25 +32,30 @@ public class GetLessonsService
         // Login user = full catalog, Guest = free only
         var isLoggedIn = userId.HasValue;
 
-        var (items, totalCount) = await _lessonRepository.GetForUserAsync(
-            request.Page,
-            request.PageSize,
-            isLoggedIn,
-            request.Level,
-            request.Type,
-            request.Category,
-            cancellationToken);
+        var cacheKey = $"lessons:{request.Page}:{request.PageSize}:{request.Level}:{request.Type}:{request.Category}:{isLoggedIn}";
 
-        var response = new GetLessonsResponse
+        var response = await _cacheService.GetOrCreateAsync(cacheKey, async (ct) =>
         {
-            Items = items.Select(MapToDto).ToList(),
-            Page = request.Page,
-            PageSize = request.PageSize,
-            TotalCount = totalCount,
-            TotalPages = (int)Math.Ceiling((double)totalCount / request.PageSize)
-        };
+            var (items, totalCount) = await _lessonRepository.GetForUserAsync(
+                request.Page,
+                request.PageSize,
+                isLoggedIn,
+                request.Level,
+                request.Type,
+                request.Category,
+                ct);
 
-        return Result.Success(response);
+            return new GetLessonsResponse
+            {
+                Items = items.Select(MapToDto).ToList(),
+                Page = request.Page,
+                PageSize = request.PageSize,
+                TotalCount = totalCount,
+                TotalPages = (int)Math.Ceiling((double)totalCount / request.PageSize)
+            };
+        }, TimeSpan.FromHours(2), cancellationToken);
+
+        return Result.Success(response!);
     }
 
     private static LessonDto MapToDto(Domain.Entities.Lesson lesson)

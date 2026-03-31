@@ -1,5 +1,6 @@
 using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
+using Demif.Application.Abstractions.Services;
 using Demif.Application.Common.Models;
 using Demif.Domain.Entities;
 using FluentValidation;
@@ -24,17 +25,29 @@ public class AdminLessonService
     private readonly IApplicationDbContext _dbContext;
     private readonly ILogger<AdminLessonService> _logger;
     private readonly IValidator<UpdateLessonMetadataRequest> _validator;
+    private readonly ICacheService _cacheService;
 
     public AdminLessonService(
         ILessonRepository lessonRepository,
         IApplicationDbContext dbContext,
         ILogger<AdminLessonService> logger,
-        IValidator<UpdateLessonMetadataRequest> validator)
+        IValidator<UpdateLessonMetadataRequest> validator,
+        ICacheService cacheService)
     {
         _lessonRepository = lessonRepository;
         _dbContext = dbContext;
         _logger = logger;
         _validator = validator;
+        _cacheService = cacheService;
+    }
+
+    private async Task InvalidateLessonCacheAsync(Guid? lessonId = null)
+    {
+        await _cacheService.RemoveByPrefixAsync("lessons:");
+        if (lessonId.HasValue)
+        {
+            await _cacheService.RemoveByPrefixAsync($"lesson:{lessonId.Value}");
+        }
     }
 
     /// <summary>
@@ -111,6 +124,8 @@ public class AdminLessonService
         await _lessonRepository.UpdateAsync(lesson, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        await InvalidateLessonCacheAsync(id);
+
         return Result.Success();
     }
 
@@ -130,6 +145,8 @@ public class AdminLessonService
 
         await _lessonRepository.UpdateAsync(lesson, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await InvalidateLessonCacheAsync(id);
 
         return Result.Success();
     }
@@ -155,6 +172,8 @@ public class AdminLessonService
 
         await _lessonRepository.UpdateAsync(lesson, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await InvalidateLessonCacheAsync(id);
 
         _logger.LogInformation("Manually re-generated DictationTemplates for lesson {LessonId}", id);
         return Result.Success();
@@ -222,14 +241,14 @@ public class AdminLessonService
         await _lessonRepository.UpdateAsync(lesson, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        await InvalidateLessonCacheAsync(id);
+
         _logger.LogInformation("Moderator updated manually customized DictationTemplates for lesson {LessonId}", id);
         return Result.Success();
     }
 
     /// <summary>
     /// Quick-create lesson — admin chỉ cần Title + paste SRT/VTT/plain transcript.
-    /// Backend auto-generate: TimedTranscript, FullTranscript, DictationTemplates, DurationSeconds.
-    /// Status mặc định = "draft" để admin review trước khi publish.
     /// </summary>
     public async Task<Result<QuickCreateLessonResponse>> QuickCreateAsync(
         QuickCreateLessonRequest request, CancellationToken cancellationToken = default)

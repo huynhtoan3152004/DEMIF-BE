@@ -72,6 +72,7 @@ public class AdminTranscriptService
 {
     private readonly ILessonRepository _lessonRepository;
     private readonly IApplicationDbContext _dbContext;
+    private readonly Demif.Application.Abstractions.Services.ICacheService _cacheService;
 
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
@@ -83,10 +84,21 @@ public class AdminTranscriptService
 
     public AdminTranscriptService(
         ILessonRepository lessonRepository,
-        IApplicationDbContext dbContext)
+        IApplicationDbContext dbContext,
+        Demif.Application.Abstractions.Services.ICacheService cacheService)
     {
         _lessonRepository = lessonRepository;
         _dbContext = dbContext;
+        _cacheService = cacheService;
+    }
+
+    private async Task InvalidateLessonCacheAsync(Guid? lessonId = null)
+    {
+        await _cacheService.RemoveByPrefixAsync("lessons:");
+        if (lessonId.HasValue)
+        {
+            await _cacheService.RemoveByPrefixAsync($"lesson:{lessonId.Value}");
+        }
     }
 
     // ── 1. Preview (admin xem tất cả segments + đáp án) ───────────────────
@@ -196,6 +208,8 @@ public class AdminTranscriptService
         await _lessonRepository.UpdateAsync(lesson, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        await InvalidateLessonCacheAsync(lessonId);
+
         var wordCount = segments.Sum(s =>
             s.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length);
 
@@ -237,6 +251,8 @@ public class AdminTranscriptService
 
         await _lessonRepository.UpdateAsync(lesson, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await InvalidateLessonCacheAsync(lessonId);
 
         return Result.Success<object>(new
         {
