@@ -58,6 +58,17 @@ public class LessonSegmentDto
     /// Null với tất cả level khác.
     /// </summary>
     public string? Text { get; set; }
+
+    // ── User progress per segment (null nếu chưa đăng nhập) ──
+
+    /// <summary>User đã hoàn thành segment này chưa</summary>
+    public bool? IsCompleted { get; set; }
+
+    /// <summary>Điểm cao nhất user đạt được cho segment này</summary>
+    public int? BestScore { get; set; }
+
+    /// <summary>Số lần user đã thử segment này</summary>
+    public int? Attempts { get; set; }
 }
 
 /// <summary>
@@ -81,4 +92,12 @@ public class LessonSegmentsResponse
 
     public List<LessonSegmentDto> Segments { get; set; } = new();
     public int TotalSegments { get; set; }
+
+    // ── User progress summary ──
+
+    /// <summary>Số segments user đã hoàn thành</summary>
+    public int CompletedCount { get; set; }
+
+    /// <summary>Phần trăm tiến độ (0–100)</summary>
+    public decimal ProgressPercent { get; set; }
 }

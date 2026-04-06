@@ -379,7 +379,7 @@ public class GetLessonSegmentsServiceTests
                  .Returns<string, Func<CancellationToken, Task<LessonSegmentsResponse?>>, TimeSpan?, CancellationToken>(
                      async (k, f, t, ct) => await f(ct));
 
-        return new GetLessonSegmentsService(lessonRepo.Object, subRepo.Object, cacheMock.Object);
+        return new GetLessonSegmentsService(lessonRepo.Object, subRepo.Object, cacheMock.Object, Mock.Of<IApplicationDbContext>());
     }
 
     [Fact]
@@ -433,7 +433,7 @@ public class GetLessonSegmentsServiceTests
                   .ReturnsAsync(lesson);
 
         var service = new GetLessonSegmentsService(
-            lessonRepo.Object, Mock.Of<IUserSubscriptionRepository>(), Mock.Of<ICacheService>());
+            lessonRepo.Object, Mock.Of<IUserSubscriptionRepository>(), Mock.Of<ICacheService>(), Mock.Of<IApplicationDbContext>());
 
         var result = await service.ExecuteAsync(lesson.Id, "Beginner");
 

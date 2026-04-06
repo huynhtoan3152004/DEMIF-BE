@@ -1,55 +1,48 @@
+using System.Text.Json.Serialization;
+
 namespace Demif.Application.Features.Payments.Webhook;
 
 /// <summary>
 /// SEPay Webhook request payload
-/// Theo format của SEPay gateway
+/// Phản ánh chi tiết theo cấu trúc JSON của SePay
 /// </summary>
 public class SePayWebhookRequest
 {
-    /// <summary>
-    /// Mã giao dịch SEPay
-    /// </summary>
-    public string? TransactionId { get; set; }
+    [JsonPropertyName("id")]
+    public long Id { get; set; }
 
-    /// <summary>
-    /// Mã tham chiếu (PaymentReference đã gửi)
-    /// </summary>
+    [JsonPropertyName("gateway")]
+    public string? Gateway { get; set; }
+
+    [JsonPropertyName("transactionDate")]
+    public string? TransactionDate { get; set; }
+
+    [JsonPropertyName("accountNumber")]
+    public string? AccountNumber { get; set; }
+
+    [JsonPropertyName("code")]
+    public string? Code { get; set; }
+
+    [JsonPropertyName("content")]
+    public string? Content { get; set; }
+
+    [JsonPropertyName("transferType")]
+    public string? TransferType { get; set; }
+
+    [JsonPropertyName("transferAmount")]
+    public decimal TransferAmount { get; set; }
+
+    [JsonPropertyName("accumulated")]
+    public decimal Accumulated { get; set; }
+
+    [JsonPropertyName("subAccount")]
+    public string? SubAccount { get; set; }
+
+    [JsonPropertyName("referenceCode")]
     public string? ReferenceCode { get; set; }
 
-    /// <summary>
-    /// Số tiền giao dịch
-    /// </summary>
-    public decimal Amount { get; set; }
-
-    /// <summary>
-    /// Mã ngân hàng
-    /// </summary>
-    public string? BankCode { get; set; }
-
-    /// <summary>
-    /// Số giao dịch ngân hàng
-    /// </summary>
-    public string? BankTransactionNo { get; set; }
-
-    /// <summary>
-    /// Nội dung chuyển khoản
-    /// </summary>
+    [JsonPropertyName("description")]
     public string? Description { get; set; }
-
-    /// <summary>
-    /// Thời gian giao dịch
-    /// </summary>
-    public DateTime? TransactionTime { get; set; }
-
-    /// <summary>
-    /// Trạng thái: success, failed
-    /// </summary>
-    public string? Status { get; set; }
-
-    /// <summary>
-    /// Signature để verify webhook
-    /// </summary>
-    public string? Signature { get; set; }
 }
 
 /// <summary>
@@ -57,6 +50,9 @@ public class SePayWebhookRequest
 /// </summary>
 public class SePayWebhookResponse
 {
+    [JsonPropertyName("success")]
     public bool Success { get; set; }
+
+    [JsonPropertyName("message")]
     public string? Message { get; set; }
 }

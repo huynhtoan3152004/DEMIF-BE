@@ -14,7 +14,7 @@
 ✅ ĐIỂM MẠNH:
 ├── Clean Architecture chuẩn (Domain → Application → Infrastructure → Api)
 ├── Entity Framework Core + PostgreSQL (scalable)
-├── JWT + Firebase Auth (đủ cho production)
+├── JWT + Google Auth (đủ cho production)
 ├── Role-based Authorization (Admin, Staff, User, Premium)
 ├── SEPay integration (đã có webhook)
 └── Code organization tốt (Feature-based folders)

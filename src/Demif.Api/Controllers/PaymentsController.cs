@@ -39,9 +39,10 @@ public class PaymentsController : ControllerBase
         [FromBody] SePayWebhookRequest request,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Received SEPay webhook: {Reference}", request.ReferenceCode);
+        _logger.LogInformation("Received SEPay webhook: {Reference}", request.Code ?? request.Content);
 
-        var result = await _sePayWebhookService.HandleWebhookAsync(request, cancellationToken);
+        var authHeader = Request.Headers["Authorization"].FirstOrDefault();
+        var result = await _sePayWebhookService.HandleWebhookAsync(request, authHeader, cancellationToken);
 
         if (result.IsFailure)
         {

@@ -1,8 +1,10 @@
 using System.Text.Json;
+using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Abstractions.Services;
 using Demif.Application.Common.Models;
 using Demif.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 
 namespace Demif.Application.Features.Lessons.GetLessonSegments;
 
@@ -16,6 +18,7 @@ public class GetLessonSegmentsService
     private readonly ILessonRepository _lessonRepository;
     private readonly IUserSubscriptionRepository _subscriptionRepository;
     private readonly ICacheService _cacheService;
+    private readonly IApplicationDbContext _dbContext;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -62,11 +65,13 @@ public class GetLessonSegmentsService
     public GetLessonSegmentsService(
         ILessonRepository lessonRepository,
         IUserSubscriptionRepository subscriptionRepository,
-        ICacheService cacheService)
+        ICacheService cacheService,
+        IApplicationDbContext dbContext)
     {
         _lessonRepository = lessonRepository;
         _subscriptionRepository = subscriptionRepository;
         _cacheService = cacheService;
+        _dbContext = dbContext;
     }
 
     public async Task<Result<LessonSegmentsResponse>> ExecuteAsync(
@@ -159,6 +164,43 @@ public class GetLessonSegmentsService
             if (!hasPremium)
                 return Result.Failure<LessonSegmentsResponse>(
                     Error.Forbidden("Bài học này chỉ dành cho Premium. Vui lòng nâng cấp tài khoản."));
+        }
+
+        // Merge user progress per segment (realtime, không cache)
+        if (userId.HasValue)
+        {
+            var exerciseProgress = await _dbContext.UserExercises
+                .Where(e => e.UserId == userId.Value && e.LessonId == lessonId && e.SegmentIndex != null)
+                .GroupBy(e => e.SegmentIndex!.Value)
+                .Select(g => new
+                {
+                    SegmentIndex = g.Key,
+                    BestScore = g.Max(e => e.Score),
+                    Attempts = g.Sum(e => e.Attempts)
+                })
+                .ToDictionaryAsync(x => x.SegmentIndex, x => x, cancellationToken);
+
+            foreach (var seg in response.Segments)
+            {
+                if (exerciseProgress.TryGetValue(seg.Index, out var progress))
+                {
+                    seg.IsCompleted = true;
+                    seg.BestScore = progress.BestScore;
+                    seg.Attempts = progress.Attempts;
+                }
+                else
+                {
+                    seg.IsCompleted = false;
+                    seg.BestScore = null;
+                    seg.Attempts = null;
+                }
+            }
+
+            var completedCount = exerciseProgress.Count;
+            response.CompletedCount = completedCount;
+            response.ProgressPercent = response.TotalSegments > 0
+                ? Math.Round((decimal)completedCount / response.TotalSegments * 100, 1)
+                : 0;
         }
 
         return Result.Success(response);

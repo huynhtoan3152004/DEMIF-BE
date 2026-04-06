@@ -42,65 +42,73 @@ public class SePayWebhookService
         _logger = logger;
     }
 
-    public async Task<Result<SePayWebhookResponse>> HandleWebhookAsync(
+        public async Task<Result<SePayWebhookResponse>> HandleWebhookAsync(
         SePayWebhookRequest request,
+        string? authorizationHeader,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Received SEPay webhook for reference: {Reference}", request.ReferenceCode);
+        _logger.LogInformation("Received SEPay webhook for transaction: {TransactionId}", request.Id);
 
-        // 1. Verify signature (optional - nếu SEPay gửi)
-        if (!string.IsNullOrEmpty(request.Signature))
+        // 1. Xác thực API Key (theo format của SePay: `Apikey YOUR_API_KEY`)
+        var configuredApiKey = _configuration["SEPay:SecretKey"];
+        if (!string.IsNullOrEmpty(configuredApiKey))
         {
-            var isValid = VerifySignature(request);
-            if (!isValid)
+            var expectedAuthHeader = $"Apikey {configuredApiKey}";
+            if (authorizationHeader != expectedAuthHeader)
             {
-                _logger.LogWarning("Invalid signature for webhook: {Reference}", request.ReferenceCode);
-                return Result.Failure<SePayWebhookResponse>(Error.Validation("Invalid signature"));
+                _logger.LogWarning("Unauthorized webhook access. Expected: {Expected}, Got: {Got}", expectedAuthHeader, authorizationHeader);
+                return Result.Failure<SePayWebhookResponse>(Error.Validation("Unauthorized"));
             }
         }
 
-        // 2. Tìm payment theo reference
-        if (string.IsNullOrEmpty(request.ReferenceCode))
+        // 2. Tìm payment theo reference code. SePay gởi ở trường `code` nếu nhận diện được.
+        // Hoặc tự trích xuất từ `content` nếu `code` null.
+        var paymentCode = request.Code;
+        if (string.IsNullOrEmpty(paymentCode) && !string.IsNullOrEmpty(request.Content))
         {
-            return Result.Failure<SePayWebhookResponse>(Error.Validation("Missing reference code"));
+            // Fallback: Tìm mã dạng DEMIFPAY... trong Content
+            var match = System.Text.RegularExpressions.Regex.Match(request.Content, @"(?i)(DEMIFPAY\w+)");
+            if (match.Success)
+            {
+                paymentCode = match.Value.ToUpper();
+            }
         }
 
-        var payment = await _paymentRepository.GetByReferenceAsync(request.ReferenceCode, cancellationToken);
+        if (string.IsNullOrEmpty(paymentCode))
+        {
+            return Result.Failure<SePayWebhookResponse>(Error.Validation("Missing payment code in webhook"));
+        }
+
+        var payment = await _paymentRepository.GetByReferenceAsync(paymentCode, cancellationToken);
         if (payment is null)
         {
-            _logger.LogWarning("Payment not found for reference: {Reference}", request.ReferenceCode);
-            return Result.Failure<SePayWebhookResponse>(Error.NotFound("Payment not found"));
+            _logger.LogWarning("Payment not found for code: {Code}", paymentCode);
+            // Vẫn trả về success để SePay không spam (nhưng ko có kết quả)
+            return Result.Success(new SePayWebhookResponse { Success = true, Message = "Payment not found but ack" });
         }
 
         // 3. Kiểm tra payment đã xử lý chưa
         if (payment.Status == PaymentStatus.Completed)
         {
-            _logger.LogInformation("Payment already processed: {Reference}", request.ReferenceCode);
+            _logger.LogInformation("Payment already processed: {Code}", paymentCode);
             return Result.Success(new SePayWebhookResponse { Success = true, Message = "Already processed" });
         }
 
-        // 4. Kiểm tra số tiền khớp
-        if (payment.Amount != request.Amount)
+        // 4. Kiểm tra loại giao dịch và số tiền
+        if (request.TransferType != "in")
         {
-            _logger.LogWarning("Amount mismatch for {Reference}: expected {Expected}, got {Got}",
-                request.ReferenceCode, payment.Amount, request.Amount);
+            return Result.Failure<SePayWebhookResponse>(Error.Validation("Not an incoming transfer"));
+        }
+
+        if (payment.Amount != request.TransferAmount)
+        {
+            _logger.LogWarning("Amount mismatch for {Code}: expected {Expected}, got {Got}",
+                paymentCode, payment.Amount, request.TransferAmount);
             return Result.Failure<SePayWebhookResponse>(Error.Validation("Amount mismatch"));
         }
 
-        // 5. Xử lý theo status
-        if (request.Status?.ToLower() == "success")
-        {
-            return await ProcessSuccessPaymentAsync(payment, request, cancellationToken);
-        }
-        else
-        {
-            payment.Status = PaymentStatus.Failed;
-            payment.GatewayResponse = System.Text.Json.JsonSerializer.Serialize(request);
-            await _paymentRepository.UpdateAsync(payment, cancellationToken);
-            await _dbContext.SaveChangesAsync(cancellationToken);
-
-            return Result.Success(new SePayWebhookResponse { Success = true, Message = "Payment failed" });
-        }
+        // 5. Nếu tới đây thì giao dịch hợp lệ
+        return await ProcessSuccessPaymentAsync(payment, request, cancellationToken);
     }
 
     private async Task<Result<SePayWebhookResponse>> ProcessSuccessPaymentAsync(
@@ -110,9 +118,9 @@ public class SePayWebhookService
     {
         // 1. Update payment
         payment.Status = PaymentStatus.Completed;
-        payment.TransactionId = request.TransactionId;
-        payment.BankCode = request.BankCode;
-        payment.BankTransactionNo = request.BankTransactionNo;
+        payment.TransactionId = request.Id.ToString(); // Set Id from SePay
+        payment.BankCode = request.Gateway;           // VCB, TPB...
+        payment.BankTransactionNo = request.ReferenceCode; // SMS Reference code
         payment.GatewayResponse = System.Text.Json.JsonSerializer.Serialize(request);
         payment.CompletedAt = DateTime.UtcNow;
 
@@ -137,7 +145,7 @@ public class SePayWebhookService
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        _logger.LogInformation("Payment processed successfully: {Reference}", request.ReferenceCode);
+        _logger.LogInformation("Payment processed successfully: {Code}", request.Code ?? request.Content);
         return Result.Success(new SePayWebhookResponse { Success = true, Message = "Payment processed" });
     }
 
@@ -168,27 +176,5 @@ public class SePayWebhookService
         }
     }
 
-    private bool VerifySignature(SePayWebhookRequest request)
-    {
-        var secretKey = _configuration["SEPay:SecretKey"];
-        if (string.IsNullOrEmpty(secretKey)) return true; // Skip if not configured
-
-        // Tạo chuỗi data để verify (format tùy theo SEPay documentation)
-        var data = $"{request.TransactionId}{request.ReferenceCode}{request.Amount}{secretKey}";
-        var computedHash = ComputeSha256Hash(data);
-
-        return computedHash.Equals(request.Signature, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string ComputeSha256Hash(string rawData)
-    {
-        using var sha256 = SHA256.Create();
-        var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(rawData));
-        var builder = new StringBuilder();
-        foreach (var b in bytes)
-        {
-            builder.Append(b.ToString("x2"));
-        }
-        return builder.ToString();
-    }
+    // Gỡ bỏ Verify Signature vì ta đổi qua dùng chứng thực API Key headers
 }

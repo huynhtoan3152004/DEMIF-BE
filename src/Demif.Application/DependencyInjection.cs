@@ -41,6 +41,7 @@ using Demif.Application.Features.Me.GetProgress;
 using Demif.Application.Features.Me.GetStreak;
 using Demif.Application.Features.Me.RecordActivity;
 using Demif.Application.Features.Me.GetUserAnalytics;
+using Demif.Application.Features.Me.Stats;
 using Demif.Application.Features.Admin.UserSubscriptions;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -117,6 +118,11 @@ public static class DependencyInjection
         services.AddScoped<GetStreakService>();
         services.AddScoped<RecordActivityService>();
         services.AddScoped<GetUserAnalyticsService>();
+
+        // Stats endpoints (Thống kê)
+        services.AddScoped<GetStatsSummaryService>();
+        services.AddScoped<GetActivityHeatmapService>();
+        services.AddScoped<GetDailyPracticeService>();
 
         // Admin User Subscriptions
         services.AddScoped<AdminUserSubscriptionService>();
