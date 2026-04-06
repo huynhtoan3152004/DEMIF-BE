@@ -26,7 +26,7 @@ namespace Demif.Api.Controllers.Admin;
 /// </summary>
 [Route("api/admin/lessons")]
 [ApiController]
-[Authorize(Policy = "RequireStaff")]
+[Authorize(Policy = "RequireModerator")]
 public class AdminLessonsController : ControllerBase
 {
     private readonly AdminLessonService _adminService;

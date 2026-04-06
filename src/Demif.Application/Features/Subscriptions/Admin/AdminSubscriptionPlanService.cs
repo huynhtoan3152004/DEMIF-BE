@@ -3,6 +3,7 @@ using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Common.Models;
 using Demif.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Demif.Application.Features.Subscriptions.Admin;
 
@@ -63,6 +64,9 @@ public class AdminSubscriptionPlanService
     /// </summary>
     public async Task<Result<Guid>> CreateAsync(CreateUpdatePlanRequest request, CancellationToken cancellationToken = default)
     {
+        if (request.Price < 0) return Result.Failure<Guid>(Error.Validation("Giá gói cước không được âm."));
+        if (request.DurationDays.HasValue && request.DurationDays <= 0) return Result.Failure<Guid>(Error.Validation("Thời hạn gói cước phải lớn hơn 0."));
+
         var plan = new SubscriptionPlan
         {
             Name = request.Name,
@@ -88,10 +92,29 @@ public class AdminSubscriptionPlanService
     /// </summary>
     public async Task<Result> UpdateAsync(Guid id, CreateUpdatePlanRequest request, CancellationToken cancellationToken = default)
     {
+        if (request.Price < 0) return Result.Failure(Error.Validation("Giá gói cước không được âm."));
+        if (request.DurationDays.HasValue && request.DurationDays <= 0) return Result.Failure(Error.Validation("Thời hạn gói cước phải lớn hơn 0."));
+
         var plan = await _planRepository.GetByIdAsync(id, cancellationToken);
         if (plan is null)
         {
             return Result.Failure(Error.NotFound("Không tìm thấy gói đăng ký."));
+        }
+
+        // Validate if in use
+        bool isUsed = await _dbContext.UserSubscriptions.AnyAsync(s => s.PlanId == id, cancellationToken) ||
+                      await _dbContext.Payments.AnyAsync(p => p.PlanId == id, cancellationToken);
+
+        if (isUsed)
+        {
+            if (plan.Price != request.Price || 
+                plan.DurationDays != request.DurationDays || 
+                plan.Tier != request.Tier || 
+                plan.BillingCycle != request.BillingCycle || 
+                plan.Currency != request.Currency)
+            {
+                return Result.Failure(Error.Validation("Gói này đã có người đăng ký hoặc thanh toán. Bạn KHÔNG ĐƯỢC thay đổi Giá, Thời hạn, Cấp độ, hoặc Chu kỳ thanh toán để tránh ảnh hưởng dữ liệu cũ. Khuyến nghị: Chuyển gói này thành Ngừng hoạt động (IsActive = false) và Tạo gói mới."));
+            }
         }
 
         plan.Name = request.Name;
