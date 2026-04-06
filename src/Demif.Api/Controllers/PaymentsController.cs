@@ -75,7 +75,10 @@ public class PaymentsController : ControllerBase
         [FromServices] Demif.Application.Abstractions.Services.ICurrentUserService currentUserService,
         CancellationToken cancellationToken)
     {
-        var result = await cancelPaymentService.ExecuteAsync(currentUserService.UserId, referenceCode, cancellationToken);
+        if (!currentUserService.UserId.HasValue)
+            return Unauthorized();
+
+        var result = await cancelPaymentService.ExecuteAsync(currentUserService.UserId.Value, referenceCode, cancellationToken);
         if (result.IsFailure)
             return BadRequest(new { error = result.Error.Message });
 
