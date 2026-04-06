@@ -50,11 +50,36 @@ public class SubscribeService
             return Result.Failure<SubscribeResponse>(Error.NotFound("Gói đăng ký không tồn tại hoặc đã ngừng hoạt động."));
         }
 
-        // 3. Kiểm tra user đã có subscription active chưa
-        var existingSubscription = await _subscriptionRepository.GetActiveSubscriptionAsync(userId, cancellationToken);
-        if (existingSubscription is not null)
+        // 3. Kiểm tra user đã có subscription active hoặc pending chưa
+        var existingSubscriptions = await _subscriptionRepository.GetByUserIdAsync(userId, cancellationToken);
+        var activeSubscription = existingSubscriptions.FirstOrDefault(s => s.Status == SubscriptionStatus.Active && (s.EndDate == null || s.EndDate > DateTime.UtcNow));
+        if (activeSubscription is not null)
         {
             return Result.Failure<SubscribeResponse>(Error.Conflict("Bạn đã có gói đăng ký đang hoạt động."));
+        }
+
+        var pendingSubscriptions = existingSubscriptions.Where(s => s.Status == SubscriptionStatus.PendingPayment).ToList();
+        foreach (var pending in pendingSubscriptions)
+        {
+            if (pending.CreatedAt < DateTime.UtcNow.AddHours(-24))
+            {
+                // Stale pending -> cancel it
+                pending.Status = SubscriptionStatus.Cancelled;
+                await _subscriptionRepository.UpdateAsync(pending, cancellationToken);
+                
+                // We should also find and cancel the associated payment
+                var pendingPayment = await _paymentRepository.GetBySubscriptionIdAsync(pending.Id, cancellationToken);
+                if (pendingPayment is not null && pendingPayment.Status == PaymentStatus.Pending)
+                {
+                    pendingPayment.Status = PaymentStatus.Failed;
+                    await _paymentRepository.UpdateAsync(pendingPayment, cancellationToken);
+                }
+            }
+            else
+            {
+                // Still valid pending
+                return Result.Failure<SubscribeResponse>(Error.Conflict("Bạn đang có một giao dịch chờ thanh toán. Vui lòng hoàn tất hoặc chờ 24h để thanh toán bị hủy tự động."));
+            }
         }
 
         // 4. Tạo payment reference duy nhất
@@ -65,10 +90,10 @@ public class SubscribeService
         {
             UserId = userId,
             PlanId = plan.Id,
-            StartDate = DateTime.UtcNow,
+            StartDate = DateTime.UtcNow, // Will be updated to actual payment time upon successful webhook
             EndDate = plan.DurationDays.HasValue 
                 ? DateTime.UtcNow.AddDays(plan.DurationDays.Value) 
-                : null, // null = lifetime
+                : null, // Will be recalculated upon successful webhook
             Status = SubscriptionStatus.PendingPayment,
             AutoRenew = request.AutoRenew
         };

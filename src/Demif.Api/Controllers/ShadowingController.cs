@@ -1,7 +1,7 @@
+using Demif.Application.Abstractions.Services;
 using Demif.Application.Features.Lessons.CheckShadowing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace Demif.Api.Controllers;
 
@@ -14,10 +14,14 @@ namespace Demif.Api.Controllers;
 public class ShadowingController : ControllerBase
 {
     private readonly CheckShadowingService _checkShadowingService;
+    private readonly ICurrentUserService _currentUserService;
 
-    public ShadowingController(CheckShadowingService checkShadowingService)
+    public ShadowingController(
+        CheckShadowingService checkShadowingService,
+        ICurrentUserService currentUserService)
     {
         _checkShadowingService = checkShadowingService;
+        _currentUserService = currentUserService;
     }
 
     /// <summary>
@@ -52,10 +56,6 @@ public class ShadowingController : ControllerBase
 
     private Guid? GetUserIdOrNull()
     {
-        var userIdClaim = User.FindFirst("userId")?.Value
-                       ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                       ?? User.FindFirst("sub")?.Value;
-
-        return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
+        return _currentUserService.UserId;
     }
 }

@@ -1,9 +1,9 @@
+using Demif.Application.Abstractions.Services;
 using Demif.Application.Features.Lessons.GetLessonById;
 using Demif.Application.Features.Lessons.GetLessons;
 using Demif.Application.Features.Lessons.GetLessonSegments;
 using Demif.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace Demif.Api.Controllers;
 
@@ -18,15 +18,18 @@ public class LessonsController : ControllerBase
     private readonly GetLessonsService _getLessonsService;
     private readonly GetLessonByIdService _getLessonByIdService;
     private readonly GetLessonSegmentsService _getSegmentsService;
+    private readonly ICurrentUserService _currentUserService;
 
     public LessonsController(
         GetLessonsService getLessonsService,
         GetLessonByIdService getLessonByIdService,
-        GetLessonSegmentsService getSegmentsService)
+        GetLessonSegmentsService getSegmentsService,
+        ICurrentUserService currentUserService)
     {
         _getLessonsService = getLessonsService;
         _getLessonByIdService = getLessonByIdService;
         _getSegmentsService = getSegmentsService;
+        _currentUserService = currentUserService;
     }
 
     /// <summary>
@@ -107,11 +110,7 @@ public class LessonsController : ControllerBase
 
     private Guid? GetUserIdOrNull()
     {
-        var userIdClaim = User.FindFirst("userId")?.Value
-                       ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                       ?? User.FindFirst("sub")?.Value;
-
-        return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
+        return _currentUserService.UserId;
     }
 }
 

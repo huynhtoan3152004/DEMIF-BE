@@ -43,6 +43,8 @@ using Demif.Application.Features.Me.RecordActivity;
 using Demif.Application.Features.Me.GetUserAnalytics;
 using Demif.Application.Features.Me.Stats;
 using Demif.Application.Features.Admin.UserSubscriptions;
+using Demif.Application.Features.Admin.Payments;
+using Demif.Application.Features.Subscriptions.ExpiryCleanup;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -126,6 +128,12 @@ public static class DependencyInjection
 
         // Admin User Subscriptions
         services.AddScoped<AdminUserSubscriptionService>();
+        
+        // Admin Payments
+        services.AddScoped<AdminPaymentService>();
+
+        // Background Job Services
+        services.AddScoped<SubscriptionExpiryService>();
 
         return services;
     }

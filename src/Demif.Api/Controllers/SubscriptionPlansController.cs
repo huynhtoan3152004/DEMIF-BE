@@ -2,6 +2,7 @@ using Demif.Application.Features.Subscriptions.CancelSubscription;
 using Demif.Application.Features.Subscriptions.GetMySubscription;
 using Demif.Application.Features.Subscriptions.GetPlans;
 using Demif.Application.Features.Subscriptions.Subscribe;
+using Demif.Application.Abstractions.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,17 +19,20 @@ public class SubscriptionPlansController : ControllerBase
     private readonly SubscribeService _subscribeService;
     private readonly GetMySubscriptionService _getMySubscriptionService;
     private readonly CancelSubscriptionService _cancelSubscriptionService;
+    private readonly ICurrentUserService _currentUserService;
 
     public SubscriptionPlansController(
         GetPlansService getPlansService,
         SubscribeService subscribeService,
         GetMySubscriptionService getMySubscriptionService,
-        CancelSubscriptionService cancelSubscriptionService)
+        CancelSubscriptionService cancelSubscriptionService,
+        ICurrentUserService currentUserService)
     {
         _getPlansService = getPlansService;
         _subscribeService = subscribeService;
         _getMySubscriptionService = getMySubscriptionService;
         _cancelSubscriptionService = cancelSubscriptionService;
+        _currentUserService = currentUserService;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -62,7 +66,7 @@ public class SubscriptionPlansController : ControllerBase
         [FromBody] SubscribeRequest request,
         CancellationToken cancellationToken)
     {
-        var userId = GetUserId();
+        var userId = _currentUserService.UserId ?? Guid.Empty;
         if (userId == Guid.Empty)
             return Unauthorized();
 
@@ -88,7 +92,7 @@ public class SubscriptionPlansController : ControllerBase
     [Authorize(Policy = "RequireUser")]
     public async Task<IActionResult> GetMySubscription(CancellationToken cancellationToken)
     {
-        var userId = GetUserId();
+        var userId = _currentUserService.UserId ?? Guid.Empty;
         if (userId == Guid.Empty)
             return Unauthorized();
 
@@ -107,7 +111,7 @@ public class SubscriptionPlansController : ControllerBase
     [Authorize(Policy = "RequireUser")]
     public async Task<IActionResult> CancelSubscription(CancellationToken cancellationToken)
     {
-        var userId = GetUserId();
+        var userId = _currentUserService.UserId ?? Guid.Empty;
         if (userId == Guid.Empty)
             return Unauthorized();
 
@@ -125,9 +129,4 @@ public class SubscriptionPlansController : ControllerBase
         return Ok(new { message = "Đã hủy tự động gia hạn. Gói của bạn sẽ hết hạn theo thời gian còn lại." });
     }
 
-    private Guid GetUserId()
-    {
-        var userIdClaim = User.FindFirst("userId")?.Value;
-        return Guid.TryParse(userIdClaim, out var userId) ? userId : Guid.Empty;
-    }
 }

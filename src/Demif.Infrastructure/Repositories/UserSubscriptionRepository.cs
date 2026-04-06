@@ -20,6 +20,16 @@ public class UserSubscriptionRepository : GenericRepository<UserSubscription>, I
         return await _dbSet
             .Where(s => s.UserId == userId && s.Status == SubscriptionStatus.Active)
             .Where(s => s.EndDate == null || s.EndDate > DateTime.UtcNow)
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<UserSubscription?> GetActiveOrPendingSubscriptionAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Where(s => s.UserId == userId && (s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.PendingPayment))
+            .Where(s => s.EndDate == null || s.EndDate > DateTime.UtcNow)
+            .OrderByDescending(s => s.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
     }
 

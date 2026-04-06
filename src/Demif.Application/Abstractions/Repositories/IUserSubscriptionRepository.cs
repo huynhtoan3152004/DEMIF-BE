@@ -8,6 +8,7 @@ namespace Demif.Application.Abstractions.Repositories;
 public interface IUserSubscriptionRepository : IGenericRepository<UserSubscription>
 {
     Task<UserSubscription?> GetActiveSubscriptionAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<UserSubscription?> GetActiveOrPendingSubscriptionAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<IEnumerable<UserSubscription>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<bool> HasActiveSubscriptionAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<UserSubscription?> GetByIdWithPlanAsync(Guid id, CancellationToken cancellationToken = default);

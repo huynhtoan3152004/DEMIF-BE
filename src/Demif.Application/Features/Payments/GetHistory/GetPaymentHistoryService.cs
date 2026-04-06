@@ -30,6 +30,7 @@ public class GetPaymentHistoryService
                 Amount          = p.Amount,
                 Currency        = p.Currency,
                 PaymentMethod   = p.PaymentMethod,
+                PlanName        = p.Plan?.Name ?? "Unknown Plan",
                 Status          = p.Status.ToString(),
                 TransactionId   = p.TransactionId,
                 BankCode        = p.BankCode,
@@ -54,6 +55,7 @@ public class PaymentHistoryItem
     public decimal   Amount        { get; set; }
     public string    Currency      { get; set; } = "VND";
     public string    PaymentMethod { get; set; } = string.Empty;
+    public string    PlanName      { get; set; } = string.Empty;
     public string    Status        { get; set; } = string.Empty;
     public string?   TransactionId { get; set; }
     public string?   BankCode      { get; set; }

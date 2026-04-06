@@ -19,7 +19,7 @@ public class GetMySubscriptionService
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        var subscription = await _subscriptionRepository.GetActiveSubscriptionAsync(userId, cancellationToken);
+        var subscription = await _subscriptionRepository.GetActiveOrPendingSubscriptionAsync(userId, cancellationToken);
 
         if (subscription is null)
         {

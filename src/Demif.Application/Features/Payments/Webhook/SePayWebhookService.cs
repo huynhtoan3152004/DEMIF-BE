@@ -66,8 +66,8 @@ public class SePayWebhookService
         var paymentCode = request.Code;
         if (string.IsNullOrEmpty(paymentCode) && !string.IsNullOrEmpty(request.Content))
         {
-            // Fallback: Tìm mã dạng DEMIFPAY... trong Content
-            var match = System.Text.RegularExpressions.Regex.Match(request.Content, @"(?i)(DEMIFPAY\w+)");
+            // Fallback: Tìm mã dạng DEMIF... trong Content
+            var match = System.Text.RegularExpressions.Regex.Match(request.Content, @"(?i)(DEMIF[A-Z0-9]+)");
             if (match.Success)
             {
                 paymentCode = match.Value.ToUpper();
@@ -127,21 +127,34 @@ public class SePayWebhookService
         await _paymentRepository.UpdateAsync(payment, cancellationToken);
 
         // 2. Activate subscription
+        DateTime? roleExpiresAt = null;
         if (payment.SubscriptionId.HasValue)
         {
-            var subscription = await _subscriptionRepository.GetByIdAsync(payment.SubscriptionId.Value, cancellationToken);
+            var subscription = await _subscriptionRepository.GetByIdWithPlanAsync(payment.SubscriptionId.Value, cancellationToken);
             if (subscription is not null)
             {
                 subscription.Status = SubscriptionStatus.Active;
                 subscription.StartDate = DateTime.UtcNow;
+                
+                // Recalculate EndDate based on actual actvation time
+                if (subscription.Plan?.DurationDays.HasValue == true)
+                {
+                    subscription.EndDate = DateTime.UtcNow.AddDays(subscription.Plan.DurationDays.Value);
+                }
+                else 
+                {
+                    subscription.EndDate = null;
+                }
+                
                 subscription.UpdatedAt = DateTime.UtcNow;
+                roleExpiresAt = subscription.EndDate;
 
                 await _subscriptionRepository.UpdateAsync(subscription, cancellationToken);
             }
         }
 
         // 3. Assign Premium role
-        await AssignPremiumRoleAsync(payment.UserId, cancellationToken);
+        await AssignPremiumRoleAsync(payment.UserId, roleExpiresAt, cancellationToken);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -149,7 +162,7 @@ public class SePayWebhookService
         return Result.Success(new SePayWebhookResponse { Success = true, Message = "Payment processed" });
     }
 
-    private async Task AssignPremiumRoleAsync(Guid userId, CancellationToken cancellationToken)
+    private async Task AssignPremiumRoleAsync(Guid userId, DateTime? expiresAt, CancellationToken cancellationToken)
     {
         var user = await _userRepository.GetByIdWithRolesAsync(userId, cancellationToken);
         if (user is null) return;
@@ -157,22 +170,27 @@ public class SePayWebhookService
         var premiumRole = await _roleRepository.GetByNameAsync("Premium", cancellationToken);
         if (premiumRole is null) return;
 
-        // Kiểm tra đã có role chưa
-        var hasRole = user.UserRoles.Any(ur =>
+        // Check if role exists and still active
+        var existingRole = user.UserRoles.FirstOrDefault(ur =>
             ur.RoleId == premiumRole.Id &&
             (ur.ExpiresAt == null || ur.ExpiresAt > DateTime.UtcNow));
 
-        if (!hasRole)
+        if (existingRole == null)
         {
             var userRole = new UserRole
             {
                 UserId = userId,
                 RoleId = premiumRole.Id,
-                AssignedAt = DateTime.UtcNow
-                // ExpiresAt = subscription.EndDate (if needed)
+                AssignedAt = DateTime.UtcNow,
+                ExpiresAt = expiresAt
             };
 
             user.UserRoles.Add(userRole);
+        }
+        else
+        {
+            // Update expiration if role already exists
+            existingRole.ExpiresAt = expiresAt;
         }
     }
 

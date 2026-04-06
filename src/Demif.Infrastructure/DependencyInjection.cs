@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Demif.Infrastructure.BackgroundServices;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Demif.Infrastructure;
@@ -50,6 +51,8 @@ public static class DependencyInjection
         services.AddSingleton<IGoogleAuthService, GoogleAuthService>();
         services.AddScoped<IEmailService, SmtpEmailService>();
         services.AddScoped<IImageUploadService, CloudinaryImageUploadService>();
+
+        services.AddHostedService<SubscriptionExpiryBackgroundService>();
 
         // YouTube service (HttpClient with timeout)
         services.AddHttpClient<IYouTubeService, YouTubeService>(client =>

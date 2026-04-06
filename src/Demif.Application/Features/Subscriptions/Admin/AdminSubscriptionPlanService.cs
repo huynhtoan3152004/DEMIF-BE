@@ -3,6 +3,7 @@ using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Common.Models;
 using Demif.Domain.Entities;
+using Demif.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Demif.Application.Features.Subscriptions.Admin;
@@ -49,12 +50,16 @@ public class AdminSubscriptionPlanService
             UpdatedAt = p.Plan.UpdatedAt
         }).ToList();
 
+        var totalRevenue = await _dbContext.Payments
+            .Where(p => p.Status == PaymentStatus.Completed)
+            .SumAsync(p => p.Amount, cancellationToken);
+
         return Result.Success(new SubscriptionStatsResponse
         {
             TotalPlans = plans.Count,
             TotalSubscribers = plans.Sum(p => p.TotalSubscribers),
             ActiveSubscribers = plans.Sum(p => p.ActiveSubscribers),
-            TotalRevenue = 0, // TODO: Calculate from payments
+            TotalRevenue = totalRevenue,
             Plans = plans
         });
     }

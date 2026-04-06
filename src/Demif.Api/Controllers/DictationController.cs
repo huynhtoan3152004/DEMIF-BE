@@ -1,10 +1,10 @@
 using Demif.Application.Features.Lessons.CheckSegment;
 using Demif.Application.Features.Lessons.GetDictationExercise;
 using Demif.Application.Features.Lessons.SubmitDictation;
+using Demif.Application.Abstractions.Services;
 using Demif.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace Demif.Api.Controllers;
 
@@ -18,15 +18,18 @@ public class DictationController : ControllerBase
     private readonly GetDictationExerciseService _getDictationExerciseService;
     private readonly SubmitDictationService _submitDictationService;
     private readonly CheckSegmentService _checkSegmentService;
+    private readonly ICurrentUserService _currentUserService;
 
     public DictationController(
         GetDictationExerciseService getDictationExerciseService,
         SubmitDictationService submitDictationService,
-        CheckSegmentService checkSegmentService)
+        CheckSegmentService checkSegmentService,
+        ICurrentUserService currentUserService)
     {
         _getDictationExerciseService = getDictationExerciseService;
         _submitDictationService = submitDictationService;
         _checkSegmentService = checkSegmentService;
+        _currentUserService = currentUserService;
     }
 
     /// <summary>
@@ -147,10 +150,6 @@ public class DictationController : ControllerBase
 
     private Guid? GetUserIdOrNull()
     {
-        var userIdClaim = User.FindFirst("userId")?.Value
-                       ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                       ?? User.FindFirst("sub")?.Value;
-
-        return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
+        return _currentUserService.UserId;
     }
 }
