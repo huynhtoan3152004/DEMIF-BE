@@ -107,6 +107,7 @@ public static class DependencyInjection
         services.AddScoped<GetPaymentInfoService>();
         services.AddScoped<GetPaymentStatusService>();
         services.AddScoped<GetPaymentHistoryService>();
+        services.AddScoped<Demif.Application.Features.Payments.CancelPayment.CancelPaymentService>();
 
         //Blog Services
         services.AddScoped<ICreateBlogService, CreateBlogService>();

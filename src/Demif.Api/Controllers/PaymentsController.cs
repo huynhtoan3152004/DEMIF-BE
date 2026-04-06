@@ -65,6 +65,24 @@ public class PaymentsController : ControllerBase
     // ═══════════════════════════════════════════════════════════════
 
     /// <summary>
+    /// FE gọi thủ công để hủy 1 giao dịch đang chờ thanh toán (PendingPayment).
+    /// </summary>
+    [HttpPost("{referenceCode}/cancel")]
+    [Authorize]
+    public async Task<IActionResult> CancelPayment(
+        string referenceCode,
+        [FromServices] Demif.Application.Features.Payments.CancelPayment.CancelPaymentService cancelPaymentService,
+        [FromServices] Demif.Application.Abstractions.Services.ICurrentUserService currentUserService,
+        CancellationToken cancellationToken)
+    {
+        var result = await cancelPaymentService.ExecuteAsync(currentUserService.UserId, referenceCode, cancellationToken);
+        if (result.IsFailure)
+            return BadRequest(new { error = result.Error.Message });
+
+        return Ok(new { success = true, message = result.Value });
+    }    
+
+    /// <summary>
     /// Lấy thông tin thanh toán SEPay: số TK, QR, nội dung CK.
     /// FE dùng để hiển thị màn hình "Chờ thanh toán".
     /// </summary>
