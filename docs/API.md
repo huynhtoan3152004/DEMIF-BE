@@ -216,10 +216,31 @@ Required shape for `PUT /api/admin/lessons/{id}/dictation-templates`:
       {
         "startTime": 0,
         "endTime": 2.5,
-        "originalText": "Hello world",
+        "originalText": "Hello world, welcome to class.",
         "words": [
           { "text": "Hello", "isBlank": false, "position": 0 },
-          { "text": "", "isBlank": true, "position": 1, "answer": "world" }
+          { "text": "", "isBlank": true, "position": 1, "answer": "world" },
+          { "text": "welcome", "isBlank": false, "position": 2 },
+          { "text": "to", "isBlank": false, "position": 3 },
+          { "text": "class.", "isBlank": false, "position": 4 }
+        ]
+      }
+    ]
+  },
+  {
+    "level": "Intermediate",
+    "blankPercentage": 30,
+    "segments": [
+      {
+        "startTime": 0,
+        "endTime": 2.5,
+        "originalText": "Hello world, welcome to class.",
+        "words": [
+          { "text": "", "isBlank": true, "position": 0, "answer": "Hello" },
+          { "text": "", "isBlank": true, "position": 1, "answer": "world" },
+          { "text": "welcome", "isBlank": false, "position": 2 },
+          { "text": "to", "isBlank": false, "position": 3 },
+          { "text": "class.", "isBlank": false, "position": 4 }
         ]
       }
     ]
@@ -228,6 +249,8 @@ Required shape for `PUT /api/admin/lessons/{id}/dictation-templates`:
 ```
 
 The backend validates that every template has `level` and every segment has `words`. If those fields are missing, the request is rejected instead of silently dropping them.
+
+Moderator/admin can keep the same transcript segment timings and only vary which words are blanked per level to produce multiple difficulty versions of the same lesson.
 
 Frontend rule of thumb:
 

@@ -7,6 +7,7 @@ using Demif.Domain.Entities;
 using Demif.Domain.Enums;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
+using System.Text.Json.Nodes;
 using System.Text.Json;
 
 namespace Demif.Application.Features.Lessons.Admin;
@@ -260,11 +261,15 @@ public class AdminLessonService
         if (string.IsNullOrWhiteSpace(dictationTemplatesJson))
             throw new ArgumentException("DictationTemplatesJson không được để trống.");
 
-        using var document = JsonDocument.Parse(dictationTemplatesJson);
-        var templates = document.RootElement.ValueKind switch
+        var node = JsonNode.Parse(dictationTemplatesJson)
+                   ?? throw new ArgumentException("DictationTemplatesJson phải là JSON object hoặc array.");
+
+        var templates = node switch
         {
-            JsonValueKind.Array => ParseTemplateArray(document.RootElement),
-            JsonValueKind.Object => ParseTemplateObject(document.RootElement),
+            JsonArray array => ParseTemplateArray(array),
+            JsonObject obj => obj["segments"] is not null || obj["level"] is not null
+                ? ParseSingleTemplateObject(obj)
+                : ParseTemplateObject(obj),
             _ => throw new ArgumentException("DictationTemplatesJson phải là JSON object hoặc array.")
         };
 
@@ -276,37 +281,111 @@ public class AdminLessonService
             .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
     }
 
-    private static Dictionary<string, DictationTemplate> ParseTemplateObject(JsonElement root)
+    private static Dictionary<string, DictationTemplate> ParseTemplateObject(JsonObject root)
     {
-        var templates = JsonSerializer.Deserialize<Dictionary<string, DictationTemplate>>(root.GetRawText(), DictationJsonOptions)
-                        ?? new Dictionary<string, DictationTemplate>(StringComparer.OrdinalIgnoreCase);
+        var templates = new Dictionary<string, DictationTemplate>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var (key, template) in templates)
+        foreach (var property in root)
         {
-            template.Level = string.IsNullOrWhiteSpace(template.Level) ? key : template.Level;
-            ValidateTemplate(template);
+            if (property.Value is not JsonObject templateObject)
+                continue;
+
+            var template = ReadTemplate(property.Key, templateObject);
+            templates[template.Level] = template;
         }
 
         return templates;
     }
 
-    private static Dictionary<string, DictationTemplate> ParseTemplateArray(JsonElement root)
+    private static Dictionary<string, DictationTemplate> ParseSingleTemplateObject(JsonObject root)
+    {
+        var singleTemplate = ReadTemplate(null, root);
+        return new Dictionary<string, DictationTemplate>(StringComparer.OrdinalIgnoreCase)
+        {
+            [singleTemplate.Level] = singleTemplate
+        };
+    }
+
+    private static Dictionary<string, DictationTemplate> ParseTemplateArray(JsonArray root)
     {
         var templates = new Dictionary<string, DictationTemplate>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var element in root.EnumerateArray())
+        foreach (var node in root)
         {
-            var template = element.Deserialize<DictationTemplate>(DictationJsonOptions)
-                           ?? throw new ArgumentException("Không thể parse một template trong mảng.");
+            if (node is not JsonObject templateObject)
+                continue;
 
-            if (string.IsNullOrWhiteSpace(template.Level))
-                throw new ArgumentException("Mỗi template phải có trường 'level'.");
-
+            var template = ReadTemplate(null, templateObject);
             ValidateTemplate(template);
             templates[template.Level] = template;
         }
 
         return templates;
+    }
+
+    private static DictationTemplate ReadTemplate(string? fallbackLevelKey, JsonObject element)
+    {
+        var body = JsonSerializer.Deserialize<DictationTemplateBody>(element.ToJsonString(), DictationJsonOptions)
+                   ?? throw new ArgumentException("Không thể parse một template.");
+
+        var level = ReadLevelString(element, fallbackLevelKey);
+        if (string.IsNullOrWhiteSpace(level))
+            throw new ArgumentException("Mỗi template phải có trường 'level'.");
+
+        return new DictationTemplate
+        {
+            Level = level,
+            BlankPercentage = body.BlankPercentage,
+            Segments = body.Segments ?? new List<DictationSegment>(),
+            TotalBlanks = body.TotalBlanks,
+            TotalWords = body.TotalWords
+        };
+    }
+
+    private static string ReadLevelString(JsonObject element, string? fallbackLevelKey)
+    {
+        var rawJson = element.ToJsonString();
+        var match = System.Text.RegularExpressions.Regex.Match(
+            rawJson,
+            "\"level\"\\s*:\\s*(?<value>\\d+|\"[^\"]+\")",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+
+        if (match.Success)
+        {
+            var rawLevel = match.Groups["value"].Value.Trim();
+            if (rawLevel.StartsWith('"') && rawLevel.EndsWith('"') && rawLevel.Length >= 2)
+            {
+                rawLevel = rawLevel[1..^1];
+            }
+
+            if (int.TryParse(rawLevel, out var numericLevel))
+            {
+                return numericLevel switch
+                {
+                    0 => Level.Beginner.ToString(),
+                    1 => Level.Intermediate.ToString(),
+                    2 => Level.Advanced.ToString(),
+                    3 => Level.Expert.ToString(),
+                    _ when Enum.IsDefined(typeof(Level), numericLevel) => ((Level)numericLevel).ToString(),
+                    _ => string.Empty
+                };
+            }
+
+            return NormalizeLevelName(rawLevel);
+        }
+
+        return NormalizeLevelName(fallbackLevelKey);
+    }
+
+    private static string NormalizeLevelName(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+            return string.Empty;
+
+        if (Enum.TryParse<Level>(rawValue, true, out var parsedLevel))
+            return parsedLevel.ToString();
+
+        return rawValue.Trim();
     }
 
     private static void ValidateTemplate(DictationTemplate template)
@@ -326,6 +405,14 @@ public class AdminLessonService
         return Enum.TryParse<Level>(level, true, out var parsedLevel)
             ? (int)parsedLevel
             : int.MaxValue;
+    }
+
+    private sealed class DictationTemplateBody
+    {
+        public int BlankPercentage { get; set; }
+        public List<DictationSegment>? Segments { get; set; }
+        public int TotalBlanks { get; set; }
+        public int TotalWords { get; set; }
     }
 
     /// <summary>

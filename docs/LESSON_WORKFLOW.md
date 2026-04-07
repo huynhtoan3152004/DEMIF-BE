@@ -114,10 +114,31 @@ Khi moderator/custom editor chỉnh blanks, backend giữ nguyên theo từng le
 			{
 				"startTime": 0,
 				"endTime": 2.5,
-				"originalText": "Hello world",
+				"originalText": "Hello world, welcome to class.",
 				"words": [
 					{ "text": "Hello", "isBlank": false, "position": 0 },
-					{ "text": "", "isBlank": true, "position": 1, "answer": "world" }
+					{ "text": "", "isBlank": true, "position": 1, "answer": "world" },
+					{ "text": "welcome", "isBlank": false, "position": 2 },
+					{ "text": "to", "isBlank": false, "position": 3 },
+					{ "text": "class.", "isBlank": false, "position": 4 }
+				]
+			}
+		]
+	},
+	"intermediate": {
+		"level": "Intermediate",
+		"blankPercentage": 30,
+		"segments": [
+			{
+				"startTime": 0,
+				"endTime": 2.5,
+				"originalText": "Hello world, welcome to class.",
+				"words": [
+					{ "text": "", "isBlank": true, "position": 0, "answer": "Hello" },
+					{ "text": "", "isBlank": true, "position": 1, "answer": "world" },
+					{ "text": "welcome", "isBlank": false, "position": 2 },
+					{ "text": "to", "isBlank": false, "position": 3 },
+					{ "text": "class.", "isBlank": false, "position": 4 }
 				]
 			}
 		]
@@ -128,6 +149,7 @@ Khi moderator/custom editor chỉnh blanks, backend giữ nguyên theo từng le
 Điểm cần nhớ:
 
 - `level` là bắt buộc cho mỗi template.
+- Moderator/admin có thể giữ nguyên cùng một `segment` nhưng tạo nhiều template khác nhau theo level để độ khó tăng dần.
 - `segments[].words` là bắt buộc, vì đây là nơi giữ `isBlank`, `answer`, `hint`, `position`.
 - `GET /api/admin/lessons/{id}/dictation-preview` giờ trả thêm `dictationTemplates` theo level để FE/moderator xem đúng blanks đã gán.
 

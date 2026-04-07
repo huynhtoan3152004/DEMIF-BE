@@ -306,6 +306,7 @@ public class TimedSegment
 
 public class DictationTemplate
 {
+    [JsonConverter(typeof(FlexibleLevelStringConverter))]
     public string Level { get; set; } = string.Empty;
     public int BlankPercentage { get; set; }
     public List<DictationSegment> Segments { get; set; } = new();
@@ -340,6 +341,44 @@ public enum HintType
     FirstLetter,
     LengthOnly,
     None
+}
+
+public sealed class FlexibleLevelStringConverter : JsonConverter<string>
+{
+    public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        return reader.TokenType switch
+        {
+            JsonTokenType.Number when reader.TryGetInt32(out var numericLevel) => NormalizeLevelName(numericLevel),
+            JsonTokenType.String => NormalizeLevelName(reader.GetString()),
+            JsonTokenType.Null => string.Empty,
+            _ => throw new JsonException("Level phải là số hoặc chuỗi hợp lệ.")
+        };
+    }
+
+    public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+    {
+        var normalized = NormalizeLevelName(value);
+        writer.WriteStringValue(string.IsNullOrWhiteSpace(normalized) ? value : normalized);
+    }
+
+    private static string NormalizeLevelName(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+            return string.Empty;
+
+        if (Enum.TryParse<Level>(rawValue, true, out var parsedLevel))
+            return parsedLevel.ToString();
+
+        return rawValue.Trim();
+    }
+
+    private static string NormalizeLevelName(int numericLevel)
+    {
+        return Enum.IsDefined(typeof(Level), numericLevel)
+            ? ((Level)numericLevel).ToString()
+            : throw new JsonException($"Level numeric value '{numericLevel}' is not valid.");
+    }
 }
 
 #endregion
