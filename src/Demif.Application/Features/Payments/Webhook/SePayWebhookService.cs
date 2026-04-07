@@ -139,9 +139,9 @@ public class SePayWebhookService
                 subscription.StartDate = DateTime.UtcNow;
                 
                 // Recalculate EndDate based on actual actvation time
-                if (subscription.Plan?.DurationDays.HasValue == true)
+                if (subscription.Plan?.BillingCycle.GetDurationDays().HasValue == true)
                 {
-                    subscription.EndDate = DateTime.UtcNow.AddDays(subscription.Plan.DurationDays.Value);
+                    subscription.EndDate = DateTime.UtcNow.AddDays(subscription.Plan.BillingCycle.GetDurationDays()!.Value);
                 }
                 else 
                 {

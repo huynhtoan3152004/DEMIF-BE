@@ -39,7 +39,6 @@ public class AdminSubscriptionPlanService
             Price = p.Plan.Price,
             Currency = p.Plan.Currency,
             BillingCycle = p.Plan.BillingCycle.ToString(),
-            DurationDays = p.Plan.DurationDays,
             Features = ParseFeatures(p.Plan.Features),
             BadgeText = p.Plan.BadgeText,
             BadgeColor = p.Plan.BadgeColor,
@@ -70,16 +69,16 @@ public class AdminSubscriptionPlanService
     public async Task<Result<Guid>> CreateAsync(CreateUpdatePlanRequest request, CancellationToken cancellationToken = default)
     {
         if (request.Price < 0) return Result.Failure<Guid>(Error.Validation("Giá gói cước không được âm."));
-        if (request.DurationDays.HasValue && request.DurationDays <= 0) return Result.Failure<Guid>(Error.Validation("Thời hạn gói cước phải lớn hơn 0."));
+        if (!request.BillingCycle.IsSupportedPremiumCycle()) return Result.Failure<Guid>(Error.Validation("Chu kỳ thanh toán chỉ hỗ trợ Weekly, Monthly hoặc Yearly."));
 
         var plan = new SubscriptionPlan
         {
             Name = request.Name,
-            Tier = request.Tier,
+            Tier = SubscriptionTier.Premium,
             Price = request.Price,
             Currency = request.Currency,
             BillingCycle = request.BillingCycle,
-            DurationDays = request.DurationDays,
+            DurationDays = request.BillingCycle.GetDurationDays(),
             Features = request.Features != null ? JsonSerializer.Serialize(request.Features) : null,
             BadgeText = request.BadgeText,
             BadgeColor = request.BadgeColor,
@@ -98,7 +97,7 @@ public class AdminSubscriptionPlanService
     public async Task<Result> UpdateAsync(Guid id, CreateUpdatePlanRequest request, CancellationToken cancellationToken = default)
     {
         if (request.Price < 0) return Result.Failure(Error.Validation("Giá gói cước không được âm."));
-        if (request.DurationDays.HasValue && request.DurationDays <= 0) return Result.Failure(Error.Validation("Thời hạn gói cước phải lớn hơn 0."));
+        if (!request.BillingCycle.IsSupportedPremiumCycle()) return Result.Failure(Error.Validation("Chu kỳ thanh toán chỉ hỗ trợ Weekly, Monthly hoặc Yearly."));
 
         var plan = await _planRepository.GetByIdAsync(id, cancellationToken);
         if (plan is null)
@@ -113,21 +112,19 @@ public class AdminSubscriptionPlanService
         if (isUsed)
         {
             if (plan.Price != request.Price || 
-                plan.DurationDays != request.DurationDays || 
-                plan.Tier != request.Tier || 
                 plan.BillingCycle != request.BillingCycle || 
                 plan.Currency != request.Currency)
             {
-                return Result.Failure(Error.Validation("Gói này đã có người đăng ký hoặc thanh toán. Bạn KHÔNG ĐƯỢC thay đổi Giá, Thời hạn, Cấp độ, hoặc Chu kỳ thanh toán để tránh ảnh hưởng dữ liệu cũ. Khuyến nghị: Chuyển gói này thành Ngừng hoạt động (IsActive = false) và Tạo gói mới."));
+                return Result.Failure(Error.Validation("Gói này đã có người đăng ký hoặc thanh toán. Bạn KHÔNG ĐƯỢC thay đổi Giá, Chu kỳ thanh toán hoặc Đơn vị tiền tệ để tránh ảnh hưởng dữ liệu cũ. Khuyến nghị: Chuyển gói này thành Ngừng hoạt động (IsActive = false) và Tạo gói mới."));
             }
         }
 
         plan.Name = request.Name;
-        plan.Tier = request.Tier;
+        plan.Tier = SubscriptionTier.Premium;
         plan.Price = request.Price;
         plan.Currency = request.Currency;
         plan.BillingCycle = request.BillingCycle;
-        plan.DurationDays = request.DurationDays;
+        plan.DurationDays = request.BillingCycle.GetDurationDays();
         plan.Features = request.Features != null ? JsonSerializer.Serialize(request.Features) : null;
         plan.BadgeText = request.BadgeText;
         plan.BadgeColor = request.BadgeColor;

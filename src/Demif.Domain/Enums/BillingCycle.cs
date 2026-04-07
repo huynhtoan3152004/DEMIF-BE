@@ -5,7 +5,8 @@ namespace Demif.Domain.Enums;
 /// </summary>
 public enum BillingCycle
 {
-    Monthly = 1,
-    Yearly = 2,
-    Lifetime = 3
+    Weekly = 1,
+    Monthly = 2,
+    Yearly = 3,
+    Lifetime = 4
 }

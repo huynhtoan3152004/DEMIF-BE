@@ -8,11 +8,9 @@ namespace Demif.Application.Features.Subscriptions.Admin;
 public class CreateUpdatePlanRequest
 {
     public string Name { get; set; } = string.Empty;
-    public SubscriptionTier Tier { get; set; } = SubscriptionTier.Premium;
     public decimal Price { get; set; }
     public string Currency { get; set; } = "VND";
     public BillingCycle BillingCycle { get; set; }
-    public int? DurationDays { get; set; }
     public List<string>? Features { get; set; }
     public string? BadgeText { get; set; }
     public string? BadgeColor { get; set; }
@@ -30,7 +28,6 @@ public class PlanAdminDto
     public decimal Price { get; set; }
     public string Currency { get; set; } = "VND";
     public string BillingCycle { get; set; } = string.Empty;
-    public int? DurationDays { get; set; }
     public List<string> Features { get; set; } = new();
     public string? BadgeText { get; set; }
     public string? BadgeColor { get; set; }

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Common.Models;
+using Demif.Domain.Enums;
 
 namespace Demif.Application.Features.Subscriptions.GetPlans;
 
@@ -22,19 +23,21 @@ public class GetPlansService
 
         var response = new GetPlansResponse
         {
-            Plans = plans.Select(p => new SubscriptionPlanDto
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Tier = p.Tier.ToString(),
-                Price = p.Price,
-                Currency = p.Currency,
-                BillingCycle = p.BillingCycle.ToString(),
-                DurationDays = p.DurationDays,
-                Features = ParseFeatures(p.Features),
-                BadgeText = p.BadgeText,
-                BadgeColor = p.BadgeColor
-            }).ToList()
+            Plans = plans
+                .Where(p => p.Tier == SubscriptionTier.Premium && p.BillingCycle.IsSupportedPremiumCycle())
+                .Select(p => new SubscriptionPlanDto
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Tier = p.Tier.ToString(),
+                    Price = p.Price,
+                    Currency = p.Currency,
+                    BillingCycle = p.BillingCycle.ToString(),
+                    Features = ParseFeatures(p.Features),
+                    BadgeText = p.BadgeText,
+                    BadgeColor = p.BadgeColor
+                })
+                .ToList()
         };
 
         return Result.Success(response);

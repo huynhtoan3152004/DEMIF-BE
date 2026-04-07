@@ -40,13 +40,13 @@ public class AdminSubscriptionPlanServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_ZeroDuration_ReturnsValidationFailure()
+    public async Task CreateAsync_UnsupportedBillingCycle_ReturnsValidationFailure()
     {
         var repoMock = new Mock<ISubscriptionPlanRepository>();
         var dbMock = CreateDbContext(new(), new());
         var service = new AdminSubscriptionPlanService(repoMock.Object, dbMock);
 
-        var request = new CreateUpdatePlanRequest { Price = 0, DurationDays = 0 };
+        var request = new CreateUpdatePlanRequest { Price = 0, BillingCycle = BillingCycle.Lifetime };
         var result = await service.CreateAsync(request);
 
         Assert.True(result.IsFailure);
@@ -74,10 +74,8 @@ public class AdminSubscriptionPlanServiceTests
         var request = new CreateUpdatePlanRequest 
         { 
             Price = 100000, // Changed
-            Tier = SubscriptionTier.Premium, 
             Currency = "VND", 
-            BillingCycle = BillingCycle.Monthly, 
-            DurationDays = 30 
+            BillingCycle = BillingCycle.Monthly 
         };
         var result = await service.UpdateAsync(planId, request);
 
@@ -107,10 +105,8 @@ public class AdminSubscriptionPlanServiceTests
         { 
             Name = "New Name",
             Price = 50000, // Unchanged
-            Tier = SubscriptionTier.Premium, // Unchanged 
             Currency = "VND", // Unchanged
             BillingCycle = BillingCycle.Monthly, // Unchanged
-            DurationDays = 30, // Unchanged
             BadgeText = "Hot", // Changed
             BadgeColor = "Red", // Changed
             IsActive = false // Deactivating plan
@@ -138,8 +134,6 @@ public class AdminSubscriptionPlanServiceTests
         var request = new CreateUpdatePlanRequest 
         { 
             Price = 100000, // Changed
-            DurationDays = 90, // Changed
-            Tier = SubscriptionTier.Premium, 
             Currency = "VND", 
             BillingCycle = BillingCycle.Monthly
         };
