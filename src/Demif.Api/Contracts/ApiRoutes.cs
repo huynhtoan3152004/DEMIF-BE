@@ -50,11 +50,16 @@ public static class ApiRoutes
         public const string GetAll = $"{Base}/admin/lessons";
         public const string GetById = $"{Base}/admin/lessons/{{id}}";
         public const string Create = $"{Base}/admin/lessons";
+        public const string QuickCreate = $"{Base}/admin/lessons/quick-create";
+        public const string CreateFromYouTube = $"{Base}/admin/lessons/from-youtube";
         public const string Update = $"{Base}/admin/lessons/{{id}}";
+        public const string UpdateTranscript = $"{Base}/admin/lessons/{{id}}/transcript";
+        public const string DictationPreview = $"{Base}/admin/lessons/{{id}}/dictation-preview";
+        public const string UpdateStatus = $"{Base}/admin/lessons/{{id}}/status";
         public const string Delete = $"{Base}/admin/lessons/{{id}}";
         public const string RegenerateTemplates = $"{Base}/admin/lessons/{{id}}/regenerate-templates";
         public const string YouTubePreview = $"{Base}/admin/lessons/youtube/preview";
-        public const string CreateFromYouTube = $"{Base}/admin/lessons/from-youtube";
+        public const string YouTubeTranscripts = $"{Base}/admin/lessons/youtube/transcripts";
     }
 
     public static class AdminSubscriptionPlans

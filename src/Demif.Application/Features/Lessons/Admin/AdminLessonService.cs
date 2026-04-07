@@ -2,9 +2,12 @@ using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Abstractions.Services;
 using Demif.Application.Common.Models;
+using Demif.Application.Features.Lessons;
 using Demif.Domain.Entities;
+using Demif.Domain.Enums;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 namespace Demif.Application.Features.Lessons.Admin;
 
@@ -49,6 +52,13 @@ public class AdminLessonService
             await _cacheService.RemoveByPrefixAsync($"lesson:{lessonId.Value}");
         }
     }
+
+    private static readonly JsonSerializerOptions DictationJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
 
     /// <summary>
     /// Lấy tất cả lessons với pagination (admin - không filter premium)
@@ -226,17 +236,15 @@ public class AdminLessonService
         if (string.IsNullOrWhiteSpace(request.DictationTemplatesJson))
             return Result.Failure(Error.Validation("DictationTemplatesJson không được để trống."));
 
-        // Validate basic JSON structure (chỉ check xem có parse được không, FE chịu trách nhiệm schema)
         try
         {
-            using var document = System.Text.Json.JsonDocument.Parse(request.DictationTemplatesJson);
+            var normalizedTemplates = ParseDictationTemplates(request.DictationTemplatesJson);
+            lesson.DictationTemplates = JsonSerializer.Serialize(normalizedTemplates, DictationJsonOptions);
         }
-        catch (System.Text.Json.JsonException)
+        catch (Exception ex)
         {
-            return Result.Failure(Error.Validation("DictationTemplatesJson không phải là JSON hợp lệ."));
+            return Result.Failure(Error.Validation($"DictationTemplatesJson không hợp lệ: {ex.Message}"));
         }
-
-        lesson.DictationTemplates = request.DictationTemplatesJson;
 
         await _lessonRepository.UpdateAsync(lesson, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -245,6 +253,79 @@ public class AdminLessonService
 
         _logger.LogInformation("Moderator updated manually customized DictationTemplates for lesson {LessonId}", id);
         return Result.Success();
+    }
+
+    public static Dictionary<string, DictationTemplate> ParseDictationTemplates(string dictationTemplatesJson)
+    {
+        if (string.IsNullOrWhiteSpace(dictationTemplatesJson))
+            throw new ArgumentException("DictationTemplatesJson không được để trống.");
+
+        using var document = JsonDocument.Parse(dictationTemplatesJson);
+        var templates = document.RootElement.ValueKind switch
+        {
+            JsonValueKind.Array => ParseTemplateArray(document.RootElement),
+            JsonValueKind.Object => ParseTemplateObject(document.RootElement),
+            _ => throw new ArgumentException("DictationTemplatesJson phải là JSON object hoặc array.")
+        };
+
+        if (templates.Count == 0)
+            throw new ArgumentException("DictationTemplatesJson không chứa level nào hợp lệ.");
+
+        return templates
+            .OrderBy(entry => GetLevelOrder(entry.Key))
+            .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static Dictionary<string, DictationTemplate> ParseTemplateObject(JsonElement root)
+    {
+        var templates = JsonSerializer.Deserialize<Dictionary<string, DictationTemplate>>(root.GetRawText(), DictationJsonOptions)
+                        ?? new Dictionary<string, DictationTemplate>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (key, template) in templates)
+        {
+            template.Level = string.IsNullOrWhiteSpace(template.Level) ? key : template.Level;
+            ValidateTemplate(template);
+        }
+
+        return templates;
+    }
+
+    private static Dictionary<string, DictationTemplate> ParseTemplateArray(JsonElement root)
+    {
+        var templates = new Dictionary<string, DictationTemplate>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var element in root.EnumerateArray())
+        {
+            var template = element.Deserialize<DictationTemplate>(DictationJsonOptions)
+                           ?? throw new ArgumentException("Không thể parse một template trong mảng.");
+
+            if (string.IsNullOrWhiteSpace(template.Level))
+                throw new ArgumentException("Mỗi template phải có trường 'level'.");
+
+            ValidateTemplate(template);
+            templates[template.Level] = template;
+        }
+
+        return templates;
+    }
+
+    private static void ValidateTemplate(DictationTemplate template)
+    {
+        if (template.Segments is null || template.Segments.Count == 0)
+            throw new ArgumentException($"Template level '{template.Level}' phải có ít nhất một segment.");
+
+        foreach (var segment in template.Segments)
+        {
+            if (segment.Words is null || segment.Words.Count == 0)
+                throw new ArgumentException($"Template level '{template.Level}' có segment thiếu 'words'.");
+        }
+    }
+
+    private static int GetLevelOrder(string level)
+    {
+        return Enum.TryParse<Level>(level, true, out var parsedLevel)
+            ? (int)parsedLevel
+            : int.MaxValue;
     }
 
     /// <summary>
@@ -259,19 +340,25 @@ public class AdminLessonService
         if (string.IsNullOrWhiteSpace(request.Transcript))
             return Result.Failure<QuickCreateLessonResponse>(Error.Validation("Transcript không được để trống."));
 
-        // Parse transcript theo format
+        // Parse transcript theo format hoặc auto-detect.
         List<TimedSegment> segments;
+        ParsedTranscriptDto transcriptPayload;
         try
         {
-            segments = request.Format.ToLowerInvariant() switch
-            {
-                "vtt" => AdminTranscriptService.ParseVtt(request.Transcript),
-                "srt" => AdminTranscriptService.ParseSrt(request.Transcript),
-                "plain" => AdminTranscriptService.GenerateFromPlain(
-                    request.Transcript, request.DurationSeconds ?? 60),
-                _ => throw new ArgumentException(
-                    $"Format '{request.Format}' không hợp lệ. Dùng: srt, vtt, plain")
-            };
+            var parseResult = AdminTranscriptService.ParseTranscriptPayload(
+                request.Transcript,
+                request.Format,
+                request.DurationSeconds);
+
+            transcriptPayload = parseResult.Transcript;
+            segments = parseResult.Segments
+                .Select(segment => new TimedSegment
+                {
+                    StartTime = segment.StartTime,
+                    EndTime = segment.EndTime,
+                    Text = segment.Text
+                })
+                .ToList();
         }
         catch (Exception ex)
         {
@@ -285,7 +372,7 @@ public class AdminLessonService
 
         var timedTranscriptJson = System.Text.Json.JsonSerializer.Serialize(segments,
             new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
-        var fullTranscript = string.Join(" ", segments.Select(s => s.Text));
+        var fullTranscript = transcriptPayload.FullTranscript;
         var duration = request.DurationSeconds
             ?? (int)Math.Ceiling(segments.Max(s => s.EndTime));
 
@@ -348,6 +435,7 @@ public class AdminLessonService
             WordCount = wordCount,
             DurationSeconds = duration,
             HasDictationTemplates = hasTemplates,
+            Transcript = transcriptPayload,
             Message = $"✅ Tạo bài '{lesson.Title}' thành công: {segments.Count} segments, {wordCount} từ."
                       + (hasTemplates ? " Đã generate DictationTemplates cho 4 levels." : "")
                       + " Status = draft → PATCH /status = published khi sẵn sàng."

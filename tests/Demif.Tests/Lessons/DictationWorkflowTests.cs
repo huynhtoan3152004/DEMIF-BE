@@ -9,6 +9,7 @@ using Demif.Domain.Entities;
 using Demif.Domain.Enums;
 using Microsoft.Extensions.Logging;
 using Moq;
+using FluentValidation;
 using System.Text.Json;
 
 namespace Demif.Tests.Lessons;
@@ -114,6 +115,30 @@ public class VttParserTests
     }
 
     [Fact]
+    public void ParseVtt_WithCueSettings_IgnoresCueMetadata()
+    {
+        var vtt = """
+            WEBVTT
+
+            1
+            00:00:01.000 --> 00:00:03.000 align:start position:0%
+            Hello, world.
+
+            NOTE this line should be ignored
+
+            2
+            00:00:04.000 --> 00:00:06.000 line:90%
+            Welcome to class.
+            """;
+
+        var segments = AdminTranscriptService.ParseVtt(vtt);
+
+        Assert.Equal(2, segments.Count);
+        Assert.Equal("Hello, world.", segments[0].Text);
+        Assert.Equal("Welcome to class.", segments[1].Text);
+    }
+
+    [Fact]
     public void ParseSrt_StandardFormat_ReturnsCorrectSegments()
     {
         // Arrange — SRT dùng dấu phẩy thay dấu chấm trong timestamp
@@ -134,6 +159,26 @@ public class VttParserTests
         Assert.Equal(2, segments.Count);
         Assert.Equal("Hello everyone.", segments[0].Text);
         Assert.Equal("Welcome to class.", segments[1].Text);
+    }
+
+    [Fact]
+    public void ParseSrt_WithCommaInText_PreservesSentenceText()
+    {
+        var srt = """
+            1
+            00:00:01,000 --> 00:00:03,000
+            Hello, everyone.
+
+            2
+            00:00:04,000 --> 00:00:06,000
+            Welcome, again.
+            """;
+
+        var segments = AdminTranscriptService.ParseSrt(srt);
+
+        Assert.Equal(2, segments.Count);
+        Assert.Equal("Hello, everyone.", segments[0].Text);
+        Assert.Equal("Welcome, again.", segments[1].Text);
     }
 
     [Fact]
@@ -507,6 +552,42 @@ public class AdminTranscriptServiceTests
         return new AdminTranscriptService(lessonRepo.Object, dbMock.Object, cacheMock.Object);
     }
 
+        [Fact]
+        public void ParseDictationTemplates_WithLevelAndWords_PreservesWords()
+        {
+                var json = """
+                        [
+                            {
+                                "level": "Beginner",
+                                "blankPercentage": 15,
+                                "segments": [
+                                    {
+                                        "startTime": 0,
+                                        "endTime": 2.5,
+                                        "originalText": "Hello world",
+                                        "words": [
+                                            { "text": "Hello", "isBlank": false, "position": 0 },
+                                            { "text": "", "isBlank": true, "position": 1, "answer": "world", "hint": "w___", "length": 5 }
+                                        ]
+                                    }
+                                ],
+                                "totalBlanks": 1,
+                                "totalWords": 2
+                            }
+                        ]
+                        """;
+
+                var templates = AdminLessonService.ParseDictationTemplates(json);
+
+                Assert.True(templates.ContainsKey("Beginner"));
+                var beginner = templates["Beginner"];
+                Assert.Equal("Beginner", beginner.Level);
+                Assert.Single(beginner.Segments);
+                Assert.Equal(2, beginner.Segments[0].Words.Count);
+                Assert.True(beginner.Segments[0].Words[1].IsBlank);
+                Assert.Equal("world", beginner.Segments[0].Words[1].Answer);
+        }
+
     [Fact]
     public async Task UpdateTranscript_ValidVtt_ParsesAndSaves()
     {
@@ -553,12 +634,28 @@ public class AdminTranscriptServiceTests
 
         var result = await service.UpdateTranscriptAsync(lesson.Id, new UpdateTranscriptRequest
         {
-            Format = "plain",
             RawContent = "Hello everyone. Welcome to today's class."
         });
 
         Assert.True(result.IsSuccess);
         Assert.True(result.Value.SegmentCount >= 1);
+        Assert.Equal("plain", result.Value.Transcript.DetectedFormat);
+        Assert.NotEmpty(result.Value.Transcript.Segments);
+    }
+
+    [Fact]
+    public void ParseTranscriptPayload_TimedContent_ReturnsSegmentsForFrontend()
+    {
+        var payload = AdminTranscriptService.ParseTranscriptPayload(
+            "1\n00:00:00.030 --> 00:00:02.790\nHello everyone\n\n2\n00:00:02.790 --> 00:00:04.799\nWelcome to class\n",
+            "auto",
+            30);
+
+        Assert.Equal("auto", payload.RequestedFormat);
+        Assert.NotEmpty(payload.Segments);
+        Assert.Equal("timed", payload.DetectedFormat);
+        Assert.Equal(2, payload.SegmentCount);
+        Assert.Equal("Hello everyone Welcome to class", payload.FullTranscript);
     }
 
     [Fact]
@@ -623,6 +720,7 @@ public class AdminTranscriptServiceTests
     public async Task GetDictationPreview_WithTranscript_ReturnsSegmentsAndAnswers()
     {
         var lesson = LessonFactory.Published("Hello everyone. Welcome here.");
+        lesson.DictationTemplates = DictationTemplateGenerator.GenerateAllTemplates(lesson.TimedTranscript!);
         var service = BuildService(lesson);
 
         var result = await service.GetDictationPreviewAsync(lesson.Id);
@@ -632,6 +730,8 @@ public class AdminTranscriptServiceTests
         Assert.True(result.Value.ReadyToPublish);
         // Admin thấy FULL text (đáp án không bị ẩn)
         Assert.All(result.Value.Segments, s => Assert.False(string.IsNullOrWhiteSpace(s.Text)));
+        Assert.True(result.Value.DictationTemplates.ContainsKey("Beginner"));
+        Assert.NotEmpty(result.Value.DictationTemplates["Beginner"].Segments[0].Words);
     }
 
     [Fact]
