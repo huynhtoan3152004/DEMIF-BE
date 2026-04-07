@@ -69,9 +69,11 @@ public class AdminLessonDto
 public class UpdateDictationTemplatesRequest
 {
     /// <summary>
-    /// JSON array of custom dictation templates from the frontend.
+    /// JSON array or object of custom dictation templates from the frontend.
     /// This will overwrite the existing auto-generated templates.
-    /// Format: [{"level": "Beginner", "segments": [{"startTime": 0.0, "endTime": 2.5, "words": [{"text": "Hello", "isBlank": false, "position": 0}, {"text": "everyone", "isBlank": true, "answer": "everyone", "position": 1}]}]}]
+    /// Required shape per level:
+    /// [{"level":"Beginner","blankPercentage":15,"segments":[{"startTime":0,"endTime":2.5,"words":[{"text":"Hello","isBlank":false,"position":0},{"text":"","isBlank":true,"position":1,"answer":"everyone"}]}]}]
+    /// Each template must include `level` and each segment must include `words`.
     /// </summary>
     public string DictationTemplatesJson { get; set; } = string.Empty;
 }

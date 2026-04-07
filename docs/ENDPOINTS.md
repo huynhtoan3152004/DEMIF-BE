@@ -162,14 +162,42 @@ if (mediaType === "video")   → render HTML5 <video> with mediaUrl
 |---|--------|-------|------|-------------|
 | 4 | `POST` | `/api/admin/lessons` | Staff+ | Create lesson manually (auto-generates DictationTemplates) |
 | 5 | `POST` | `/api/admin/lessons/from-youtube` | Staff+ | Create lesson from YouTube URL (auto-fetch metadata + captions) |
-| 6 | `POST` | `/api/admin/lessons/{id}/regenerate-templates` | Staff+ | Re-generate DictationTemplates for existing lesson |
+| 6 | `POST` | `/api/admin/lessons/quick-create` | Staff+ | Create lesson from raw transcript block (auto-detect format) |
+| 7 | `POST` | `/api/admin/lessons/{id}/regenerate-templates` | Staff+ | Re-generate DictationTemplates for existing lesson |
 
 ### PUT/DELETE Endpoints
 
 | # | Method | Route | Auth | Description |
 |---|--------|-------|------|-------------|
-| 7 | `PUT` | `/api/admin/lessons/{id}` | Staff+ | Update lesson (re-generates templates if transcript changed) |
-| 8 | `DELETE` | `/api/admin/lessons/{id}` | Staff+ | Soft delete lesson (archived) |
+| 8 | `PUT` | `/api/admin/lessons/{id}` | Staff+ | Update lesson (metadata only) |
+| 9 | `PATCH` | `/api/admin/lessons/{id}/transcript` | Staff+ | Replace transcript by pasting raw transcript block |
+| 10 | `GET` | `/api/admin/lessons/{id}/dictation-preview` | Staff+ | Preview parsed transcript and answers |
+| 11 | `DELETE` | `/api/admin/lessons/{id}` | Staff+ | Soft delete lesson (archived) |
+
+### Transcript Contract for FE
+
+For both `quick-create` and `PATCH /transcript`, FE should bind these fields from the response:
+
+- `transcript.requestedFormat`
+- `transcript.detectedFormat`
+- `transcript.fullTranscript`
+- `transcript.segmentCount`
+- `transcript.wordCount`
+- `transcript.segments[].index`
+- `transcript.segments[].startTime`
+- `transcript.segments[].endTime`
+- `transcript.segments[].text`
+- `transcript.segments[].wordCount`
+
+### Dictation Template Contract
+
+`GET /api/admin/lessons/{id}/dictation-preview` now includes `dictationTemplates` grouped by level and preserving `words` per segment.
+
+When sending `PATCH /api/admin/lessons/{id}/transcript` or `PUT /api/admin/lessons/{id}/dictation-templates`, keep these rules:
+
+- Each template must have a `level` field.
+- Each segment must have a `words` array.
+- `words[].isBlank`, `words[].answer`, `words[].hint`, and `words[].position` are preserved by backend.
 
 ---
 

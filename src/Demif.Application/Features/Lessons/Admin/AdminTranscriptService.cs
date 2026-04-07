@@ -2,6 +2,7 @@ using System.Text.Json;
 using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Common.Models;
+using Demif.Application.Features.Lessons;
 using Demif.Domain.Enums;
 
 namespace Demif.Application.Features.Lessons.Admin;
@@ -14,10 +15,10 @@ public class UpdateTranscriptRequest
     public string RawContent { get; set; } = string.Empty;
 
     /// <summary>
-    /// "vtt" | "srt" | "plain"
+    /// "auto" | "vtt" | "srt" | "plain"
     /// plain = chỉ text, không có timestamp → dùng auto-generate timing (kém chính xác hơn)
     /// </summary>
-    public string Format { get; set; } = "vtt";
+    public string Format { get; set; } = "auto";
 }
 
 public class UpdateTranscriptResponse
@@ -26,6 +27,7 @@ public class UpdateTranscriptResponse
     public int SegmentCount { get; set; }
     public int WordCount { get; set; }
     public bool DictationTemplatesRegenerated { get; set; }
+    public ParsedTranscriptDto Transcript { get; set; } = new();
     public string Message { get; set; } = string.Empty;
 }
 
@@ -55,6 +57,7 @@ public class AdminDictationPreviewResponse
     public bool ReadyToPublish { get; set; }
     public List<string> PublishBlockers { get; set; } = new();
     public List<AdminDictationPreviewSegment> Segments { get; set; } = new();
+    public Dictionary<string, DictationTemplate> DictationTemplates { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 // ─── Service ────────────────────────────────────────────────────────────────
@@ -118,6 +121,9 @@ public class AdminTranscriptService
         if (string.IsNullOrWhiteSpace(lesson.FullTranscript))
             blockers.Add("Chưa có FullTranscript.");
 
+        if (string.IsNullOrWhiteSpace(lesson.DictationTemplates))
+            blockers.Add("Chưa có DictationTemplates.");
+
         List<TimedSegment> segments = new();
         if (!string.IsNullOrWhiteSpace(lesson.TimedTranscript))
         {
@@ -141,6 +147,19 @@ public class AdminTranscriptService
             WordCount = s.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length
         }).ToList();
 
+        var dictationTemplates = new Dictionary<string, DictationTemplate>(StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(lesson.DictationTemplates))
+        {
+            try
+            {
+                dictationTemplates = AdminLessonService.ParseDictationTemplates(lesson.DictationTemplates);
+            }
+            catch
+            {
+                blockers.Add("DictationTemplates bị lỗi format — cần regenerate hoặc update lại.");
+            }
+        }
+
         return Result.Success(new AdminDictationPreviewResponse
         {
             LessonId = lesson.Id,
@@ -150,7 +169,8 @@ public class AdminTranscriptService
             TotalWords = segmentDtos.Sum(s => s.WordCount),
             ReadyToPublish = blockers.Count == 0,
             PublishBlockers = blockers,
-            Segments = segmentDtos
+            Segments = segmentDtos,
+            DictationTemplates = dictationTemplates
         });
     }
 
@@ -169,15 +189,12 @@ public class AdminTranscriptService
 
         // Parse theo format
         List<TimedSegment> segments;
+        string detectedFormat;
         try
         {
-            segments = request.Format.ToLowerInvariant() switch
-            {
-                "vtt" => ParseVtt(request.RawContent),
-                "srt" => ParseSrt(request.RawContent),
-                "plain" => GenerateFromPlain(request.RawContent, lesson.DurationSeconds),
-                _ => throw new ArgumentException($"Format '{request.Format}' không hợp lệ. Dùng: vtt, srt, plain")
-            };
+            var parseResult = ParseTranscriptPayload(request.RawContent, request.Format, lesson.DurationSeconds);
+            segments = parseResult.Segments;
+            detectedFormat = parseResult.DetectedFormat;
         }
         catch (Exception ex)
         {
@@ -219,6 +236,7 @@ public class AdminTranscriptService
             SegmentCount = segments.Count,
             WordCount = wordCount,
             DictationTemplatesRegenerated = templatesRegenerated,
+            Transcript = BuildTranscriptDto(request.Format, detectedFormat, segments),
             Message = $"✅ Cập nhật transcript thành công: {segments.Count} segments, {wordCount} từ."
                       + (templatesRegenerated ? " Đã regenerate DictationTemplates." : "")
         });
@@ -275,41 +293,38 @@ public class AdminTranscriptService
     public static List<TimedSegment> ParseVtt(string content)
     {
         var segments = new List<TimedSegment>();
-        var lines = content.Split('\n', StringSplitOptions.None);
-        double? start = null, end = null;
-        var textLines = new List<string>();
-
-        foreach (var rawLine in lines)
+        foreach (var block in SplitTranscriptBlocks(content))
         {
-            var line = rawLine.Trim();
+            if (block.Count == 0)
+                continue;
 
-            if (line.Contains("-->"))
-            {
-                // Flush previous segment
-                if (start.HasValue && textLines.Count > 0)
-                    segments.Add(MakeSegment(start.Value, end ?? start.Value, textLines));
+            if (block.Any(line => line.StartsWith("WEBVTT", StringComparison.OrdinalIgnoreCase)))
+                continue;
 
-                var parts = line.Split("-->", 2);
-                start = ParseTimestamp(parts[0].Trim());
-                end = ParseTimestamp(parts[1].Trim().Split(' ', 2)[0]); // Trim trước để tránh split ra ""
-                textLines = new List<string>();
-            }
-            else if (!string.IsNullOrWhiteSpace(line)
-                     && !line.StartsWith("WEBVTT", StringComparison.OrdinalIgnoreCase)
-                     && !IsNumericCueId(line))
+            if (block[0].StartsWith("NOTE", StringComparison.OrdinalIgnoreCase)
+                || block[0].StartsWith("STYLE", StringComparison.OrdinalIgnoreCase)
+                || block[0].StartsWith("REGION", StringComparison.OrdinalIgnoreCase))
             {
-                textLines.Add(line);
+                continue;
             }
-            else if (string.IsNullOrWhiteSpace(line) && start.HasValue && textLines.Count > 0)
-            {
-                segments.Add(MakeSegment(start.Value, end ?? start.Value, textLines));
-                start = null; end = null; textLines = new List<string>();
-            }
+
+            var timingLineIndex = block.FindIndex(line => line.Contains("-->", StringComparison.Ordinal));
+            if (timingLineIndex < 0)
+                continue;
+
+            if (!TryParseCueTimingLine(block[timingLineIndex], out var start, out var end))
+                continue;
+
+            var textLines = block
+                .Skip(timingLineIndex + 1)
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .ToList();
+
+            if (textLines.Count == 0)
+                continue;
+
+            segments.Add(MakeSegment(start, end, textLines));
         }
-
-        // Flush last
-        if (start.HasValue && textLines.Count > 0)
-            segments.Add(MakeSegment(start.Value, end ?? start.Value, textLines));
 
         return segments;
     }
@@ -321,7 +336,41 @@ public class AdminTranscriptService
     ///   Hello everyone
     /// </summary>
     public static List<TimedSegment> ParseSrt(string content)
-        => ParseVtt(content.Replace(",", ".")); // SRT dùng dấu phẩy, VTT dùng dấu chấm
+    {
+        var normalizedBlocks = SplitTranscriptBlocks(content)
+            .Select(block => block
+                .Select(line => line.Contains("-->", StringComparison.Ordinal)
+                    ? NormalizeSrtCueLine(line)
+                    : line)
+                .ToList())
+            .ToList();
+
+        var segments = new List<TimedSegment>();
+        foreach (var block in normalizedBlocks)
+        {
+            if (block.Count == 0)
+                continue;
+
+            var timingLineIndex = block.FindIndex(line => line.Contains("-->", StringComparison.Ordinal));
+            if (timingLineIndex < 0)
+                continue;
+
+            if (!TryParseCueTimingLine(block[timingLineIndex], out var start, out var end))
+                continue;
+
+            var textLines = block
+                .Skip(timingLineIndex + 1)
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .ToList();
+
+            if (textLines.Count == 0)
+                continue;
+
+            segments.Add(MakeSegment(start, end, textLines));
+        }
+
+        return segments;
+    }
 
     /// <summary>Plain text không có timestamp → dùng auto-generate (kém chính xác).</summary>
     public static List<TimedSegment> GenerateFromPlain(string content, int durationSeconds)
@@ -331,6 +380,45 @@ public class AdminTranscriptService
         {
             PropertyNameCaseInsensitive = true
         }) ?? new List<TimedSegment>();
+    }
+
+    /// <summary>
+    /// Parse transcript cho FE/backend dùng chung.
+    /// Auto-detect mặc định ưu tiên file có timestamps; nếu không có timestamps thì xem như plain text.
+    /// </summary>
+    public static TranscriptParseResult ParseTranscriptPayload(
+        string rawContent,
+        string? format,
+        int? durationSeconds = null)
+    {
+        if (string.IsNullOrWhiteSpace(rawContent))
+            throw new ArgumentException("Transcript content không được để trống.");
+
+        var normalizedFormat = NormalizeFormat(format);
+        var parseMode = normalizedFormat == "auto"
+            ? DetectParseMode(rawContent)
+            : normalizedFormat;
+
+        var detectedFormat = parseMode == "plain" ? "plain" : "timed";
+
+        List<TimedSegment> segments = parseMode switch
+        {
+            "vtt" => ParseVtt(rawContent),
+            "srt" => ParseSrt(rawContent),
+            "plain" => GenerateFromPlain(rawContent, durationSeconds ?? 60),
+            _ => throw new ArgumentException($"Format '{format}' không hợp lệ. Dùng: auto, vtt, srt, plain")
+        };
+
+        if (segments.Count == 0)
+            throw new ArgumentException("Không tìm thấy segment nào trong nội dung transcript.");
+
+        return new TranscriptParseResult
+        {
+            RequestedFormat = normalizedFormat,
+            DetectedFormat = detectedFormat,
+            Segments = segments,
+            Transcript = BuildTranscriptDto(normalizedFormat, detectedFormat, segments)
+        };
     }
 
     private static TimedSegment MakeSegment(double start, double end, List<string> textLines)
@@ -364,4 +452,120 @@ public class AdminTranscriptService
 
     private static bool IsNumericCueId(string line)
         => int.TryParse(line, out _);
+
+    private static List<List<string>> SplitTranscriptBlocks(string content)
+    {
+        var blocks = new List<List<string>>();
+        var currentBlock = new List<string>();
+
+        foreach (var rawLine in content.Split('\n', StringSplitOptions.None))
+        {
+            var line = rawLine.TrimEnd('\r');
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                if (currentBlock.Count > 0)
+                {
+                    blocks.Add(currentBlock);
+                    currentBlock = new List<string>();
+                }
+
+                continue;
+            }
+
+            currentBlock.Add(line.Trim());
+        }
+
+        if (currentBlock.Count > 0)
+            blocks.Add(currentBlock);
+
+        return blocks;
+    }
+
+    private static string NormalizeSrtCueLine(string cueLine)
+    {
+        var parts = cueLine.Split("-->", 2, StringSplitOptions.None);
+        if (parts.Length != 2)
+            return cueLine;
+
+        var start = parts[0].Trim().Replace(',', '.');
+        var endAndSettings = parts[1].Trim();
+        var endParts = endAndSettings.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        var end = endParts.Length > 0 ? endParts[0].Replace(',', '.') : endAndSettings.Replace(',', '.');
+        var settings = endParts.Length > 1 ? " " + endParts[1] : string.Empty;
+        return $"{start} --> {end}{settings}";
+    }
+
+    private static bool TryParseCueTimingLine(string timingLine, out double start, out double end)
+    {
+        start = 0;
+        end = 0;
+
+        var parts = timingLine.Split("-->", 2, StringSplitOptions.None);
+        if (parts.Length != 2)
+            return false;
+
+        var startText = parts[0].Trim();
+        var endText = parts[1].Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries)[0];
+
+        try
+        {
+            start = ParseTimestamp(startText);
+            end = ParseTimestamp(endText);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static ParsedTranscriptDto BuildTranscriptDto(
+        string requestedFormat,
+        string detectedFormat,
+        List<TimedSegment> segments)
+    {
+        var transcriptSegments = segments.Select((segment, index) => new TranscriptSegmentDto
+        {
+            Index = index,
+            StartTime = segment.StartTime,
+            EndTime = segment.EndTime,
+            Text = segment.Text,
+            WordCount = CountWords(segment.Text)
+        }).ToList();
+
+        return new ParsedTranscriptDto
+        {
+            RequestedFormat = requestedFormat,
+            DetectedFormat = detectedFormat,
+            FullTranscript = string.Join(" ", segments.Select(s => s.Text)),
+            SegmentCount = transcriptSegments.Count,
+            WordCount = transcriptSegments.Sum(s => s.WordCount),
+            Segments = transcriptSegments
+        };
+    }
+
+    private static string NormalizeFormat(string? format)
+    {
+        var normalized = (format ?? string.Empty).Trim().ToLowerInvariant();
+        return string.IsNullOrWhiteSpace(normalized) ? "auto" : normalized;
+    }
+
+    private static string DetectParseMode(string rawContent)
+    {
+        if (LooksLikeTimedTranscript(rawContent))
+            return rawContent.Contains(',', StringComparison.Ordinal) ? "srt" : "vtt";
+
+        return "plain";
+    }
+
+    private static bool LooksLikeTimedTranscript(string rawContent)
+    {
+        return rawContent.Contains("-->", StringComparison.Ordinal)
+               || rawContent.Contains("WEBVTT", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int CountWords(string text)
+        => string.IsNullOrWhiteSpace(text)
+            ? 0
+            : text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
 }

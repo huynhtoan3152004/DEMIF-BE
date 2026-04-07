@@ -152,8 +152,88 @@ Accepts string or number: `Beginner`/`0`, `Intermediate`/`1`, `Advanced`/`2`, `E
 | PUT | `/api/admin/lessons/{id}` | Staff | Update lesson |
 | DELETE | `/api/admin/lessons/{id}` | Staff | Delete lesson (archive) |
 | POST | `/api/admin/lessons/{id}/regenerate-templates` | Staff | Regenerate dictation templates |
+| POST | `/api/admin/lessons/quick-create` | Staff | Create lesson from raw transcript (auto-detect format) |
+| PATCH | `/api/admin/lessons/{id}/transcript` | Staff | Replace transcript by pasting raw SRT/VTT/plain content |
+| GET | `/api/admin/lessons/{id}/dictation-preview` | Staff | Preview parsed transcript + answers |
 | GET | `/api/admin/lessons/youtube/preview?url=...` | Staff | Preview YouTube video metadata |
+| GET | `/api/admin/lessons/youtube/transcripts?url=...` | Staff | Fetch YouTube captions/transcripts |
 | POST | `/api/admin/lessons/from-youtube` | Staff | Create lesson from YouTube URL |
+
+### Raw Transcript Contract
+
+When the frontend pastes a whole transcript block, send it to either `POST /api/admin/lessons/quick-create` or `PATCH /api/admin/lessons/{id}/transcript`.
+
+Request fields:
+
+```json
+{
+  "title": "Lesson title",
+  "transcript": "1\n00:00:00.030 --> 00:00:02.790\nHello everyone\n",
+  "format": "auto",
+  "durationSeconds": 30
+}
+```
+
+Response fields to bind in FE:
+
+```json
+{
+  "lessonId": "guid",
+  "segmentCount": 2,
+  "wordCount": 41,
+  "durationSeconds": 30,
+  "transcript": {
+    "requestedFormat": "auto",
+    "detectedFormat": "timed",
+    "fullTranscript": "Hello everyone Welcome to class",
+    "segmentCount": 2,
+    "wordCount": 41,
+    "segments": [
+      {
+        "index": 0,
+        "startTime": 0.03,
+        "endTime": 2.79,
+        "text": "Hello everyone",
+        "wordCount": 2
+      }
+    ]
+  }
+}
+```
+
+### Dictation Templates
+
+`GET /api/admin/lessons/{id}/dictation-preview` also returns `dictationTemplates`, grouped by level and preserving the `words` array. The frontend should treat this as the source of truth for moderator edits.
+
+Required shape for `PUT /api/admin/lessons/{id}/dictation-templates`:
+
+```json
+[
+  {
+    "level": "Beginner",
+    "blankPercentage": 15,
+    "segments": [
+      {
+        "startTime": 0,
+        "endTime": 2.5,
+        "originalText": "Hello world",
+        "words": [
+          { "text": "Hello", "isBlank": false, "position": 0 },
+          { "text": "", "isBlank": true, "position": 1, "answer": "world" }
+        ]
+      }
+    ]
+  }
+]
+```
+
+The backend validates that every template has `level` and every segment has `words`. If those fields are missing, the request is rejected instead of silently dropping them.
+
+Frontend rule of thumb:
+
+- Render `transcript.fullTranscript` for a flat preview.
+- Render `transcript.segments[].text` for per-block UI.
+- Use `transcript.segments[].startTime` and `endTime` only for sync with the player.
 
 ---
 
