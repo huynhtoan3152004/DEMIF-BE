@@ -51,16 +51,16 @@ public class SePayWebhookService
         _logger.LogInformation("Received SEPay webhook for transaction: {TransactionId}", request.Id);
 
         // 1. Xác thực API Key (theo format của SePay: `Apikey YOUR_API_KEY`)
-        var configuredApiKey = _configuration["SEPay:SecretKey"];
+        var configuredApiKey = _configuration["SEPay:SecretKey"]?.Trim();
         if (!string.IsNullOrEmpty(configuredApiKey))
         {
             var expectedAuthHeader = $"Apikey {configuredApiKey}";
-            bool isHeaderValid = !string.IsNullOrEmpty(authorizationHeader) && authorizationHeader.Equals(expectedAuthHeader, StringComparison.OrdinalIgnoreCase);
-            bool isQueryValid = !string.IsNullOrEmpty(apiKeyQuery) && apiKeyQuery.Equals(configuredApiKey, StringComparison.Ordinal);
+            bool isHeaderValid = !string.IsNullOrEmpty(authorizationHeader) && authorizationHeader.Trim().Equals(expectedAuthHeader, StringComparison.OrdinalIgnoreCase);
+            bool isQueryValid = !string.IsNullOrEmpty(apiKeyQuery) && apiKeyQuery.Trim().Equals(configuredApiKey, StringComparison.Ordinal);
 
             if (!isHeaderValid && !isQueryValid)
             {
-                _logger.LogWarning("Unauthorized webhook access. Header got: {HeaderGot}, Query got: {QueryGot}", authorizationHeader, apiKeyQuery);
+                _logger.LogWarning("Unauthorized webhook access. Header got: '{HeaderGot}', Query got: '{QueryGot}', Expected: '{Expected}'", authorizationHeader, apiKeyQuery, configuredApiKey);
                 return Result.Failure<SePayWebhookResponse>(Error.Validation("Unauthorized"));
             }
         }
