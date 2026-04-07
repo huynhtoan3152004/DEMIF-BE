@@ -50,8 +50,25 @@ public class SubscribeService
             return Result.Failure<SubscribeResponse>(Error.NotFound("Gói đăng ký không tồn tại hoặc đã ngừng hoạt động."));
         }
 
-        // 3. Kiểm tra user đã có subscription active hoặc pending chưa
+        if (plan.Tier != SubscriptionTier.Premium)
+        {
+            return Result.Failure<SubscribeResponse>(Error.Validation("Chỉ các gói Premium mới có thể được đăng ký."));
+        }
+
+        if (!plan.BillingCycle.IsSupportedPremiumCycle())
+        {
+            return Result.Failure<SubscribeResponse>(Error.Validation("Chu kỳ gói không hợp lệ."));
+        }
+
+        // 3. Kiểm tra lịch sử và trạng thái subscription hiện có của user
         var existingSubscriptions = await _subscriptionRepository.GetByUserIdAsync(userId, cancellationToken);
+
+        if (plan.BillingCycle == BillingCycle.Weekly && existingSubscriptions.Any(s => s.PlanId == plan.Id))
+        {
+            return Result.Failure<SubscribeResponse>(Error.Conflict("Gói Premium 7 ngày chỉ được đăng ký một lần cho mỗi tài khoản."));
+        }
+
+        // 4. Kiểm tra user đã có subscription active hoặc pending chưa
         var activeSubscription = existingSubscriptions.FirstOrDefault(s => s.Status == SubscriptionStatus.Active && (s.EndDate == null || s.EndDate > DateTime.UtcNow));
         if (activeSubscription is not null)
         {
@@ -82,17 +99,17 @@ public class SubscribeService
             }
         }
 
-        // 4. Tạo payment reference duy nhất
+        // 5. Tạo payment reference duy nhất
         var paymentReference = GeneratePaymentReference(userId);
 
-        // 5. Tạo subscription (pending)
+        // 6. Tạo subscription (pending)
         var subscription = new UserSubscription
         {
             UserId = userId,
             PlanId = plan.Id,
             StartDate = DateTime.UtcNow, // Will be updated to actual payment time upon successful webhook
-            EndDate = plan.DurationDays.HasValue 
-                ? DateTime.UtcNow.AddDays(plan.DurationDays.Value) 
+            EndDate = plan.BillingCycle.GetDurationDays().HasValue 
+                ? DateTime.UtcNow.AddDays(plan.BillingCycle.GetDurationDays()!.Value) 
                 : null, // Will be recalculated upon successful webhook
             Status = SubscriptionStatus.PendingPayment,
             AutoRenew = request.AutoRenew
@@ -100,7 +117,7 @@ public class SubscribeService
 
         await _subscriptionRepository.AddAsync(subscription, cancellationToken);
 
-        // 6. Tạo payment record
+        // 7. Tạo payment record
         var payment = new Payment
         {
             UserId = userId,

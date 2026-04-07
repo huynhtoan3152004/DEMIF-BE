@@ -11,7 +11,6 @@ public class SubscriptionPlanDto
     public decimal Price { get; set; }
     public string Currency { get; set; } = "VND";
     public string BillingCycle { get; set; } = string.Empty;
-    public int? DurationDays { get; set; }
     public List<string> Features { get; set; } = new();
     public string? BadgeText { get; set; }
     public string? BadgeColor { get; set; }
