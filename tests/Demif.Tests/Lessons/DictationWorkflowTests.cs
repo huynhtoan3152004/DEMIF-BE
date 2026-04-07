@@ -588,6 +588,37 @@ public class AdminTranscriptServiceTests
                 Assert.Equal("world", beginner.Segments[0].Words[1].Answer);
         }
 
+        [Fact]
+        public void ParseDictationTemplates_WithNumericLevel_AcceptsIntegerLevel()
+        {
+                var json = """
+                        {
+                            "level": 0,
+                            "blankPercentage": 15,
+                            "segments": [
+                                {
+                                    "startTime": 0,
+                                    "endTime": 2.5,
+                                    "originalText": "Hello world",
+                                    "words": [
+                                        { "text": "Hello", "isBlank": false, "position": 0 },
+                                        { "text": "", "isBlank": true, "position": 1, "answer": "world" }
+                                    ]
+                                }
+                            ],
+                            "totalBlanks": 1,
+                            "totalWords": 2
+                        }
+                        """;
+
+                var templates = AdminLessonService.ParseDictationTemplates(json);
+
+                Assert.True(templates.ContainsKey("Beginner"));
+                Assert.Equal("Beginner", templates["Beginner"].Level);
+                Assert.Single(templates["Beginner"].Segments);
+                Assert.Equal(2, templates["Beginner"].Segments[0].Words.Count);
+        }
+
     [Fact]
     public async Task UpdateTranscript_ValidVtt_ParsesAndSaves()
     {
