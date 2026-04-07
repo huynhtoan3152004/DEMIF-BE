@@ -45,6 +45,7 @@ public class SePayWebhookService
         public async Task<Result<SePayWebhookResponse>> HandleWebhookAsync(
         SePayWebhookRequest request,
         string? authorizationHeader,
+        string? apiKeyQuery,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Received SEPay webhook for transaction: {TransactionId}", request.Id);
@@ -54,9 +55,12 @@ public class SePayWebhookService
         if (!string.IsNullOrEmpty(configuredApiKey))
         {
             var expectedAuthHeader = $"Apikey {configuredApiKey}";
-            if (authorizationHeader != expectedAuthHeader)
+            bool isHeaderValid = !string.IsNullOrEmpty(authorizationHeader) && authorizationHeader.Equals(expectedAuthHeader, StringComparison.OrdinalIgnoreCase);
+            bool isQueryValid = !string.IsNullOrEmpty(apiKeyQuery) && apiKeyQuery.Equals(configuredApiKey, StringComparison.Ordinal);
+
+            if (!isHeaderValid && !isQueryValid)
             {
-                _logger.LogWarning("Unauthorized webhook access. Expected: {Expected}, Got: {Got}", expectedAuthHeader, authorizationHeader);
+                _logger.LogWarning("Unauthorized webhook access. Header got: {HeaderGot}, Query got: {QueryGot}", authorizationHeader, apiKeyQuery);
                 return Result.Failure<SePayWebhookResponse>(Error.Validation("Unauthorized"));
             }
         }

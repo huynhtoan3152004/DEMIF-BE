@@ -42,7 +42,9 @@ public class PaymentsController : ControllerBase
         _logger.LogInformation("Received SEPay webhook: {Reference}", request.Code ?? request.Content);
 
         var authHeader = Request.Headers["Authorization"].FirstOrDefault();
-        var result = await _sePayWebhookService.HandleWebhookAsync(request, authHeader, cancellationToken);
+        var apiKeyQuery = Request.Query["apikey"].FirstOrDefault();
+        
+        var result = await _sePayWebhookService.HandleWebhookAsync(request, authHeader, apiKeyQuery, cancellationToken);
 
         if (result.IsFailure)
         {
