@@ -128,8 +128,6 @@ public class SePayWebhookService
         payment.GatewayResponse = System.Text.Json.JsonSerializer.Serialize(request);
         payment.CompletedAt = DateTime.UtcNow;
 
-        await _paymentRepository.UpdateAsync(payment, cancellationToken);
-
         // 2. Activate subscription
         DateTime? roleExpiresAt = null;
         if (payment.SubscriptionId.HasValue)
@@ -152,8 +150,6 @@ public class SePayWebhookService
                 
                 subscription.UpdatedAt = DateTime.UtcNow;
                 roleExpiresAt = subscription.EndDate;
-
-                await _subscriptionRepository.UpdateAsync(subscription, cancellationToken);
             }
         }
 
