@@ -63,9 +63,19 @@ public class SubscribeService
         // 3. Kiểm tra lịch sử và trạng thái subscription hiện có của user
         var existingSubscriptions = await _subscriptionRepository.GetByUserIdAsync(userId, cancellationToken);
 
-        if (plan.BillingCycle == BillingCycle.Weekly && existingSubscriptions.Any(s => s.PlanId == plan.Id))
+        if (plan.BillingCycle == BillingCycle.Weekly)
         {
-            return Result.Failure<SubscribeResponse>(Error.Conflict("Gói Premium 7 ngày chỉ được đăng ký một lần cho mỗi tài khoản."));
+            var hasCompletedTrial = existingSubscriptions.Any(s =>
+                s.PlanId == plan.Id &&
+                (
+                    s.Status == SubscriptionStatus.Expired ||
+                    (s.Status == SubscriptionStatus.Active && s.EndDate.HasValue && s.EndDate.Value <= DateTime.UtcNow)
+                ));
+
+            if (hasCompletedTrial)
+            {
+                return Result.Failure<SubscribeResponse>(Error.Conflict("Gói Premium 7 ngày chỉ được đăng ký lại sau khi chu kỳ dùng thử trước đó kết thúc."));
+            }
         }
 
         // 4. Kiểm tra user đã có subscription active hoặc pending chưa
