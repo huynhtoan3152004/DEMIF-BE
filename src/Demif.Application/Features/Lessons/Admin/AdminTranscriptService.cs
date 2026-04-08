@@ -375,7 +375,8 @@ public class AdminTranscriptService
     /// <summary>Plain text không có timestamp → dùng auto-generate (kém chính xác).</summary>
     public static List<TimedSegment> GenerateFromPlain(string content, int durationSeconds)
     {
-        var json = DictationTemplateGenerator.GenerateTimedTranscript(content, durationSeconds);
+        var normalizedContent = StripLeadingInlineTimestamps(content);
+        var json = DictationTemplateGenerator.GenerateTimedTranscript(normalizedContent, durationSeconds);
         return JsonSerializer.Deserialize<List<TimedSegment>>(json, new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
@@ -562,6 +563,34 @@ public class AdminTranscriptService
     {
         return rawContent.Contains("-->", StringComparison.Ordinal)
                || rawContent.Contains("WEBVTT", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string StripLeadingInlineTimestamps(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return content;
+
+        var timestampPrefix = new System.Text.RegularExpressions.Regex(
+            @"^(?<timestamp>(?:\d{1,2}:)?\d{1,2}:\d{2}(?:[\.,]\d{1,3})?)\s+",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        var lines = content.Split(['\r', '\n'], StringSplitOptions.None);
+        var cleanedLines = new List<string>(lines.Length);
+
+        foreach (var rawLine in lines)
+        {
+            var line = rawLine.Trim();
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                cleanedLines.Add(string.Empty);
+                continue;
+            }
+
+            var cleaned = timestampPrefix.Replace(line, string.Empty, 1).Trim();
+            cleanedLines.Add(cleaned);
+        }
+
+        return string.Join(Environment.NewLine, cleanedLines);
     }
 
     private static int CountWords(string text)
