@@ -690,6 +690,22 @@ public class AdminTranscriptServiceTests
     }
 
     [Fact]
+    public void ParseTranscriptPayload_PlainInlineTimestamps_StripsTimestampPrefixes()
+    {
+        var payload = AdminTranscriptService.ParseTranscriptPayload(
+            "00:00:00.240 Very few people know this, but I don't wear a watch.\n00:00:04.319 And the reason why I don't wear a watch is now the most important time.",
+            "auto",
+            30);
+
+        Assert.Equal("plain", payload.DetectedFormat);
+        Assert.NotEmpty(payload.Segments);
+        Assert.DoesNotContain("00:00:00.240", payload.FullTranscript);
+        Assert.DoesNotContain("00:00:04.319", payload.FullTranscript);
+        Assert.DoesNotContain("00:00:00.240", payload.Segments[0].Text);
+        Assert.DoesNotContain("00:00:04.319", payload.Segments[0].Text);
+    }
+
+    [Fact]
     public async Task UpdateTranscript_EmptyContent_ReturnsValidation()
     {
         var lesson = LessonFactory.Draft();
