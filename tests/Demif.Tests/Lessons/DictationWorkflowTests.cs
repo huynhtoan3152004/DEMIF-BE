@@ -706,6 +706,24 @@ public class AdminTranscriptServiceTests
     }
 
     [Fact]
+    public void ParseTranscriptPayload_PlainInlineTimestamps_RemovesRepeatedCueTokens()
+    {
+        var payload = AdminTranscriptService.ParseTranscriptPayload(
+            "00:00:00.240 Very few people know this, but I don't wear a watch. 00:00:01.760 And the reason why I don't wear a watch is now the most important time. 00:00:04.319 Just dedicate yourself to now.",
+            "auto",
+            30);
+
+        Assert.Equal("plain", payload.DetectedFormat);
+        Assert.NotEmpty(payload.Segments);
+        Assert.DoesNotContain("00:00:00.240", payload.FullTranscript);
+        Assert.DoesNotContain("00:00:01.760", payload.FullTranscript);
+        Assert.DoesNotContain("00:00:04.319", payload.FullTranscript);
+        Assert.DoesNotContain("00:00:00.240", payload.Segments[0].Text);
+        Assert.DoesNotContain("00:00:01.760", payload.Segments[0].Text);
+        Assert.DoesNotContain("00:00:04.319", payload.Segments[0].Text);
+    }
+
+    [Fact]
     public async Task UpdateTranscript_EmptyContent_ReturnsValidation()
     {
         var lesson = LessonFactory.Draft();
