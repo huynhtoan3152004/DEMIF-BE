@@ -89,12 +89,12 @@ public class RefreshTokenService
         var newRefreshTokenValue = _jwtTokenService.GenerateRefreshToken();
 
         // 5. Lưu refresh token mới
-        var refreshTokenDays = int.Parse(_configuration["Jwt:RefreshTokenExpirationDays"] ?? "7");
+        var refreshTokenHours = int.Parse(_configuration["Jwt:RefreshTokenExpirationHours"] ?? "12");
         var newRefreshToken = new Domain.Entities.RefreshToken
         {
             Token = newRefreshTokenValue,
             UserId = user.Id,
-            ExpiresAt = DateTime.UtcNow.AddDays(refreshTokenDays),
+            ExpiresAt = DateTime.UtcNow.AddHours(refreshTokenHours),
             CreatedByIp = ipAddress
         };
 

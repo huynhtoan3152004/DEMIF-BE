@@ -74,7 +74,7 @@ public class VerifyEmailService
         {
             Token = refreshToken,
             UserId = user.Id,
-            ExpiresAt = DateTime.UtcNow.AddDays(int.Parse(_configuration["Jwt:RefreshTokenExpirationDays"] ?? "7"))
+            ExpiresAt = DateTime.UtcNow.AddHours(int.Parse(_configuration["Jwt:RefreshTokenExpirationHours"] ?? "12"))
         });
         await _dbContext.SaveChangesAsync(cancellationToken);
 
