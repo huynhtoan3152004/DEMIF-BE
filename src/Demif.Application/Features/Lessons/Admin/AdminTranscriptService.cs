@@ -375,7 +375,7 @@ public class AdminTranscriptService
     /// <summary>Plain text không có timestamp → dùng auto-generate (kém chính xác).</summary>
     public static List<TimedSegment> GenerateFromPlain(string content, int durationSeconds)
     {
-        var normalizedContent = StripLeadingInlineTimestamps(content);
+        var normalizedContent = StripTranscriptTimestamps(content);
         var json = DictationTemplateGenerator.GenerateTimedTranscript(normalizedContent, durationSeconds);
         return JsonSerializer.Deserialize<List<TimedSegment>>(json, new JsonSerializerOptions
         {
@@ -565,13 +565,13 @@ public class AdminTranscriptService
                || rawContent.Contains("WEBVTT", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string StripLeadingInlineTimestamps(string content)
+    private static string StripTranscriptTimestamps(string content)
     {
         if (string.IsNullOrWhiteSpace(content))
             return content;
 
-        var timestampPrefix = new System.Text.RegularExpressions.Regex(
-            @"^(?<timestamp>(?:\d{1,2}:)?\d{1,2}:\d{2}(?:[\.,]\d{1,3})?)\s+",
+        var timestampToken = new System.Text.RegularExpressions.Regex(
+            @"(?<!\w)\d{1,2}:\d{2}:\d{2}(?:[\.,]\d{1,3})?(?!\w)",
             System.Text.RegularExpressions.RegexOptions.Compiled);
 
         var lines = content.Split(['\r', '\n'], StringSplitOptions.None);
@@ -586,7 +586,8 @@ public class AdminTranscriptService
                 continue;
             }
 
-            var cleaned = timestampPrefix.Replace(line, string.Empty, 1).Trim();
+            var cleaned = timestampToken.Replace(line, string.Empty);
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\s{2,}", " ").Trim();
             cleanedLines.Add(cleaned);
         }
 
