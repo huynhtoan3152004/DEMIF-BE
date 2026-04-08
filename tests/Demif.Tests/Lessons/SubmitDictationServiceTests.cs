@@ -425,6 +425,53 @@ public class SubmitDictationServiceTests
         Assert.Equal(firstBlank.Answer, answerResult.CorrectAnswer);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_UserTranscriptSample_AllCorrectAnswers_Returns100Percent()
+    {
+        var transcript = "Mastering any physical skill, be it performing a pirouette, playing an instrument, or throwing a baseball,";
+        var timedTranscript = DictationTemplateGenerator.GenerateTimedTranscript(transcript, 20);
+        var dictationTemplates = DictationTemplateGenerator.GenerateAllTemplates(timedTranscript);
+
+        var lesson = new Lesson
+        {
+            Id = Guid.NewGuid(),
+            Title = "Transcript Sample",
+            AudioUrl = "https://example.com/audio.mp3",
+            DurationSeconds = 20,
+            FullTranscript = transcript,
+            TimedTranscript = timedTranscript,
+            DictationTemplates = dictationTemplates,
+            Status = "published"
+        };
+
+        _lessonRepoMock.Setup(r => r.GetByIdAsync(lesson.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(lesson);
+
+        var template = DictationTemplateGenerator.GetTemplateForLevel(lesson.DictationTemplates!, Level.Beginner)!;
+        var answers = template.Segments
+            .SelectMany((segment, segmentIndex) => segment.Words
+                .Where(word => word.IsBlank)
+                .Select(word => new UserAnswerInput
+                {
+                    SegmentIndex = segmentIndex,
+                    Position = word.Position,
+                    UserInput = word.Answer!
+                }))
+            .ToList();
+
+        var result = await _service.ExecuteAsync(lesson.Id, Guid.NewGuid(), new DictationSubmitRequest
+        {
+            Level = "Beginner",
+            TimeSpentSeconds = 12,
+            Answers = answers
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(100m, result.Value.Score);
+        Assert.Equal(result.Value.TotalBlanks, result.Value.CorrectCount);
+        Assert.All(result.Value.Results, item => Assert.True(item.IsCorrect));
+    }
+
     [Theory]
     [InlineData("Beginner")]
     [InlineData("Intermediate")]
