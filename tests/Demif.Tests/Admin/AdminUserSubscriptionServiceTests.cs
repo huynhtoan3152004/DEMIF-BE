@@ -1,3 +1,4 @@
+using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Features.Admin.UserSubscriptions;
 using Demif.Domain.Entities;
@@ -13,12 +14,23 @@ namespace Demif.Tests.Admin;
 public class AdminUserSubscriptionServiceTests
 {
     private readonly Mock<IUserSubscriptionRepository> _repoMock;
+    private readonly Mock<IUserRepository> _userRepoMock;
+    private readonly Mock<IRoleRepository> _roleRepoMock;
+    private readonly Mock<IApplicationDbContext> _contextMock;
     private readonly AdminUserSubscriptionService _service;
 
     public AdminUserSubscriptionServiceTests()
     {
         _repoMock = new Mock<IUserSubscriptionRepository>();
-        _service = new AdminUserSubscriptionService(_repoMock.Object);
+        _userRepoMock = new Mock<IUserRepository>();
+        _roleRepoMock = new Mock<IRoleRepository>();
+        _contextMock = new Mock<IApplicationDbContext>();
+
+        _service = new AdminUserSubscriptionService(
+            _repoMock.Object,
+            _userRepoMock.Object,
+            _roleRepoMock.Object,
+            _contextMock.Object);
     }
 
     // ── GetAllAsync ───────────────────────────────────────────────────────────

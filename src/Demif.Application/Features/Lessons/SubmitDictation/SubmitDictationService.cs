@@ -55,6 +55,7 @@ public class SubmitDictationService
         // 4. Chấm điểm từng answer
         var results = new List<AnswerResult>();
         var correctCount = 0;
+        var processedBlanks = new HashSet<(int SegmentIndex, int Position)>();
 
         foreach (var userAnswer in request.Answers)
         {
@@ -90,6 +91,21 @@ public class SubmitDictationService
                 continue;
             }
 
+            var blankKey = (userAnswer.SegmentIndex, userAnswer.Position);
+            if (!processedBlanks.Add(blankKey))
+            {
+                results.Add(new AnswerResult
+                {
+                    SegmentIndex = userAnswer.SegmentIndex,
+                    Position = userAnswer.Position,
+                    IsCorrect = false,
+                    UserInput = userAnswer.UserInput,
+                    CorrectAnswer = blankWord.Answer ?? "",
+                    Message = "Blank này đã được submit trước đó."
+                });
+                continue;
+            }
+
             // So sánh case-insensitive, loại bỏ dấu câu + khoảng trắng thừa
             var isCorrect = NormalizeForComparison(userAnswer.UserInput) ==
                             NormalizeForComparison(blankWord.Answer ?? "");
@@ -109,10 +125,15 @@ public class SubmitDictationService
 
         // 5. Tính điểm
         var totalBlanks = template.TotalBlanks;
-        var answeredBlanks = request.Answers.Count;
+        var answeredBlanks = processedBlanks.Count;
         var score = totalBlanks > 0
             ? (decimal)correctCount / totalBlanks * 100
             : 0;
+        var answeredAccuracy = answeredBlanks > 0
+            ? (decimal)correctCount / answeredBlanks * 100
+            : 0;
+        var isSubmissionComplete = totalBlanks == 0 || answeredBlanks == totalBlanks;
+        var isFullyCorrect = totalBlanks > 0 && correctCount == totalBlanks;
 
         // 6. Lưu kết quả vào UserExercise — UPSERT pattern (tránh lỗi 500 khi submit lại)
         var userInputJson = JsonSerializer.Serialize(request.Answers, new JsonSerializerOptions
@@ -168,19 +189,22 @@ public class SubmitDictationService
         await UpdateLessonStatsAsync(lesson, lessonId, cancellationToken);
 
         _logger.LogInformation(
-            "User {UserId} submitted dictation for lesson {LessonId} (Level: {Level}): {Score}% ({Correct}/{Total})",
-            userId, lessonId, level, Math.Round(score, 1), correctCount, totalBlanks);
+            "User {UserId} submitted dictation for lesson {LessonId} (Level: {Level}): {Score}% ({Correct}/{Answered}/{Total}), perfect: {IsFullyCorrect}",
+            userId, lessonId, level, Math.Round(score, 1), correctCount, answeredBlanks, totalBlanks, isFullyCorrect);
 
         return Result.Success(new DictationSubmitResponse
         {
             ExerciseId = exercise.Id,
             Score = Math.Round(score, 1),
+            AnsweredAccuracy = Math.Round(answeredAccuracy, 1),
             TotalBlanks = totalBlanks,
             AnsweredBlanks = answeredBlanks,
             CorrectCount = correctCount,
             IncorrectCount = answeredBlanks - correctCount,
             SkippedCount = totalBlanks - answeredBlanks,
             Level = level.ToString(),
+            IsSubmissionComplete = isSubmissionComplete,
+            IsFullyCorrect = isFullyCorrect,
             Results = results,
             TimeSpentSeconds = request.TimeSpentSeconds
         });
@@ -225,8 +249,8 @@ public class SubmitDictationService
             return "";
 
         return input.Trim()
-            .TrimEnd('.', ',', '!', '?', ';', ':', '\'', '"')
-            .TrimStart('\'', '"')
+            .TrimEnd('.', ',', '!', '?', ';', ':', '\'', '"', ')', ']', '}')
+            .TrimStart('\'', '"', '(', '[', '{')
             .ToLowerInvariant();
     }
 }
@@ -282,12 +306,15 @@ public class DictationSubmitResponse
 {
     public Guid ExerciseId { get; set; }
     public decimal Score { get; set; }
+    public decimal AnsweredAccuracy { get; set; }
     public int TotalBlanks { get; set; }
     public int AnsweredBlanks { get; set; }
     public int CorrectCount { get; set; }
     public int IncorrectCount { get; set; }
     public int SkippedCount { get; set; }
     public string Level { get; set; } = string.Empty;
+    public bool IsSubmissionComplete { get; set; }
+    public bool IsFullyCorrect { get; set; }
     public int TimeSpentSeconds { get; set; }
     public List<AnswerResult> Results { get; set; } = new();
 }

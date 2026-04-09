@@ -285,12 +285,15 @@ Response chính:
 {
   "exerciseId": "guid",
   "score": 92,
+  "answeredAccuracy": 100,
   "totalBlanks": 12,
   "answeredBlanks": 10,
   "correctCount": 9,
   "incorrectCount": 1,
   "skippedCount": 2,
   "level": "Intermediate",
+  "isSubmissionComplete": false,
+  "isFullyCorrect": false,
   "timeSpentSeconds": 120,
   "results": [
     {

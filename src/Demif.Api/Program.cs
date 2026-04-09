@@ -1,6 +1,7 @@
 using Demif.Api.Configurations;
 using Demif.Application;
 using Demif.Infrastructure;
+using Demif.Api.Middlewares;
 using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using System.Threading.RateLimiting;

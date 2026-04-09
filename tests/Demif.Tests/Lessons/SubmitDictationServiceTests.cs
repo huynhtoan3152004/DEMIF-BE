@@ -96,8 +96,11 @@ public class SubmitDictationServiceTests
         // Assert
         Assert.True(result.IsSuccess);
         Assert.Equal(100.0m, result.Value.Score);
+        Assert.Equal(100.0m, result.Value.AnsweredAccuracy);
         Assert.Equal(result.Value.TotalBlanks, result.Value.CorrectCount);
         Assert.Equal(0, result.Value.IncorrectCount);
+        Assert.True(result.Value.IsSubmissionComplete);
+        Assert.True(result.Value.IsFullyCorrect);
     }
 
     [Fact]
@@ -250,6 +253,9 @@ public class SubmitDictationServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal(1, result.Value.AnsweredBlanks);
         Assert.Equal(1, result.Value.CorrectCount);
+        Assert.Equal(100.0m, result.Value.AnsweredAccuracy);
+        Assert.False(result.Value.IsSubmissionComplete);
+        Assert.False(result.Value.IsFullyCorrect);
         Assert.True(result.Value.SkippedCount >= 0);
     }
 
@@ -468,7 +474,10 @@ public class SubmitDictationServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(100m, result.Value.Score);
+        Assert.Equal(100m, result.Value.AnsweredAccuracy);
         Assert.Equal(result.Value.TotalBlanks, result.Value.CorrectCount);
+        Assert.True(result.Value.IsSubmissionComplete);
+        Assert.True(result.Value.IsFullyCorrect);
         Assert.All(result.Value.Results, item => Assert.True(item.IsCorrect));
     }
 
@@ -477,17 +486,91 @@ public class SubmitDictationServiceTests
     [InlineData("Intermediate")]
     [InlineData("Advanced")]
     [InlineData("Expert")]
-    public async Task ExecuteAsync_AllLevels_WorkCorrectly(string level)
+    public async Task ExecuteAsync_AllLevels_FullyCorrectSubmission_Returns100Percent(string level)
     {
         var lesson = CreateLessonWithTemplates();
         _lessonRepoMock.Setup(r => r.GetByIdAsync(lesson.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(lesson);
 
-        var request = new DictationSubmitRequest { Level = level, Answers = new(), TimeSpentSeconds = 10 };
-        var result = await _service.ExecuteAsync(lesson.Id, Guid.NewGuid(), request);
+        var levelEnum = Enum.Parse<Level>(level, ignoreCase: true);
+        var template = DictationTemplateGenerator.GetTemplateForLevel(lesson.DictationTemplates!, levelEnum)!;
+        var answers = template.Segments
+            .SelectMany((segment, segmentIndex) => segment.Words
+                .Where(word => word.IsBlank)
+                .Select(word => new UserAnswerInput
+                {
+                    SegmentIndex = segmentIndex,
+                    Position = word.Position,
+                    UserInput = word.Answer!
+                }))
+            .ToList();
+
+        var result = await _service.ExecuteAsync(lesson.Id, Guid.NewGuid(), new DictationSubmitRequest
+        {
+            Level = level,
+            TimeSpentSeconds = 10,
+            Answers = answers
+        });
 
         Assert.True(result.IsSuccess);
         Assert.Equal(level, result.Value.Level);
+        Assert.Equal(100m, result.Value.Score);
+        Assert.Equal(100m, result.Value.AnsweredAccuracy);
+        Assert.True(result.Value.IsSubmissionComplete);
+        Assert.True(result.Value.IsFullyCorrect);
+        Assert.Equal(result.Value.TotalBlanks, result.Value.CorrectCount);
+        Assert.All(result.Value.Results, item => Assert.True(item.IsCorrect));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ExpertShortTranscript_CanBlankAllWordsAndSubmitCorrectly()
+    {
+        var transcript = "Hello world.";
+        var timedTranscript = DictationTemplateGenerator.GenerateTimedTranscript(transcript, 6);
+        var dictationTemplates = DictationTemplateGenerator.GenerateAllTemplates(timedTranscript);
+
+        var lesson = new Lesson
+        {
+            Id = Guid.NewGuid(),
+            Title = "Expert Short Transcript",
+            AudioUrl = "https://example.com/audio.mp3",
+            DurationSeconds = 6,
+            FullTranscript = transcript,
+            TimedTranscript = timedTranscript,
+            DictationTemplates = dictationTemplates,
+            Status = "published"
+        };
+
+        _lessonRepoMock.Setup(r => r.GetByIdAsync(lesson.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(lesson);
+
+        var expertTemplate = DictationTemplateGenerator.GetTemplateForLevel(lesson.DictationTemplates!, Level.Expert)!;
+        Assert.Equal(expertTemplate.TotalWords, expertTemplate.TotalBlanks);
+
+        var answers = expertTemplate.Segments
+            .SelectMany((segment, segmentIndex) => segment.Words
+                .Where(word => word.IsBlank)
+                .Select(word => new UserAnswerInput
+                {
+                    SegmentIndex = segmentIndex,
+                    Position = word.Position,
+                    UserInput = word.Answer!
+                }))
+            .ToList();
+
+        var result = await _service.ExecuteAsync(lesson.Id, Guid.NewGuid(), new DictationSubmitRequest
+        {
+            Level = "Expert",
+            TimeSpentSeconds = 8,
+            Answers = answers
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(100m, result.Value.Score);
+        Assert.Equal(100m, result.Value.AnsweredAccuracy);
+        Assert.True(result.Value.IsSubmissionComplete);
+        Assert.True(result.Value.IsFullyCorrect);
+        Assert.Equal(result.Value.TotalBlanks, result.Value.AnsweredBlanks);
     }
 
     #endregion
