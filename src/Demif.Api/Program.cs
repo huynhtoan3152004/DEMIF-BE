@@ -74,6 +74,9 @@ var app = builder.Build();
 // Enable CORS
 app.UseCors("AllowAll");
 
+// Exception Middleware - catch all errors and return JSON with CORS headers
+app.UseExceptionMiddleware();
+
 // Rate Limiting
 app.UseRateLimiter();
 

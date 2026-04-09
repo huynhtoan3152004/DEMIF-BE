@@ -103,4 +103,61 @@ public class AdminUserSubscriptionsController : ControllerBase
 
         return Ok(new { message = result.Value });
     }
+
+    /// <summary>
+    /// Manually create a new user subscription.
+    /// Any existing active subscriptions for the user will be auto-expired.
+    /// </summary>
+    [HttpPost]
+    [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Create([FromBody] CreateUserSubscriptionRequest request, CancellationToken ct)
+    {
+        var result = await _service.CreateAsync(request, ct);
+        if (result.IsFailure)
+            return BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+
+        return CreatedAtAction(nameof(GetById), new { id = result.Value }, result.Value);
+    }
+
+    /// <summary>
+    /// Full update of a user subscription.
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateUserSubscriptionRequest request, CancellationToken ct)
+    {
+        var result = await _service.UpdateAsync(id, request, ct);
+        if (result.IsFailure)
+        {
+            if (result.Error.Code.Contains("NotFound"))
+                return NotFound(new { error = result.Error.Code, message = result.Error.Message });
+
+            return BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Soft delete a user subscription (sets status to Cancelled).
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        var result = await _service.DeleteAsync(id, ct);
+        if (result.IsFailure)
+        {
+            if (result.Error.Code.Contains("NotFound"))
+                return NotFound(new { error = result.Error.Code, message = result.Error.Message });
+
+            return BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return NoContent();
+    }
 }

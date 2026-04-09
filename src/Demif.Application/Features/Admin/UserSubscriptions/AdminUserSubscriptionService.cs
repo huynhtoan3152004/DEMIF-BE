@@ -1,6 +1,9 @@
+using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Common.Models;
+using Demif.Domain.Entities;
 using Demif.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 
 namespace Demif.Application.Features.Admin.UserSubscriptions;
 
@@ -10,10 +13,20 @@ namespace Demif.Application.Features.Admin.UserSubscriptions;
 public class AdminUserSubscriptionService
 {
     private readonly IUserSubscriptionRepository _subscriptionRepo;
+    private readonly IUserRepository _userRepository;
+    private readonly IRoleRepository _roleRepository;
+    private readonly IApplicationDbContext _context;
 
-    public AdminUserSubscriptionService(IUserSubscriptionRepository subscriptionRepo)
+    public AdminUserSubscriptionService(
+        IUserSubscriptionRepository subscriptionRepo,
+        IUserRepository userRepository,
+        IRoleRepository roleRepository,
+        IApplicationDbContext context)
     {
         _subscriptionRepo = subscriptionRepo;
+        _userRepository = userRepository;
+        _roleRepository = roleRepository;
+        _context = context;
     }
 
     // ─── Get paginated list ────────────────────────────────────────────────────
@@ -116,6 +129,10 @@ public class AdminUserSubscriptionService
 
         await _subscriptionRepo.UpdateAsync(sub, ct);
 
+        // Sync role
+        await SyncUserRoleAsync(sub.UserId, ct);
+        await _context.SaveChangesAsync(ct);
+
         return Result<string>.Success($"Subscription extended by {request.Days} day(s). New end date: {sub.EndDate:yyyy-MM-dd}.");
     }
 
@@ -136,6 +153,129 @@ public class AdminUserSubscriptionService
 
         await _subscriptionRepo.UpdateAsync(sub, ct);
 
+        // Sync role
+        await SyncUserRoleAsync(sub.UserId, ct);
+        await _context.SaveChangesAsync(ct);
+
         return Result<string>.Success("Subscription cancelled successfully.");
     }
-}
+
+    // ─── Full CRUD ────────────────────────────────────────────────────────────
+
+    public async Task<Result<Guid>> CreateAsync(CreateUserSubscriptionRequest request, CancellationToken ct = default)
+    {
+        // 1. Auto-expire old active/pending subscriptions
+        var existingSubs = await _subscriptionRepo.GetByUserIdAsync(request.UserId, ct);
+        foreach (var existing in existingSubs.Where(s => s.Status is SubscriptionStatus.Active or SubscriptionStatus.PendingPayment))
+        {
+            existing.Status = SubscriptionStatus.Expired;
+            existing.UpdatedAt = DateTime.UtcNow;
+            await _subscriptionRepo.UpdateAsync(existing, ct);
+        }
+
+        // 2. Create new subscription
+        var sub = new UserSubscription
+        {
+            UserId = request.UserId,
+            PlanId = request.PlanId,
+            StartDate = request.StartDate,
+            EndDate = request.EndDate,
+            Status = request.Status,
+            AutoRenew = request.AutoRenew,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _subscriptionRepo.AddAsync(sub, ct);
+        
+        // 3. Sync role
+        await SyncUserRoleAsync(request.UserId, ct);
+        
+        await _context.SaveChangesAsync(ct);
+        return Result<Guid>.Success(sub.Id);
+    }
+
+    public async Task<Result> UpdateAsync(Guid id, UpdateUserSubscriptionRequest request, CancellationToken ct = default)
+    {
+        var sub = await _subscriptionRepo.GetByIdAsync(id, ct);
+        if (sub is null)
+            return Result.Failure(new Error("Admin.Subscription.NotFound", "Subscription not found."));
+
+        sub.PlanId = request.PlanId;
+        sub.StartDate = request.StartDate;
+        sub.EndDate = request.EndDate;
+        sub.Status = request.Status;
+        sub.AutoRenew = request.AutoRenew;
+        sub.UpdatedAt = DateTime.UtcNow;
+
+        await _subscriptionRepo.UpdateAsync(sub, ct);
+
+        // Sync role
+        await SyncUserRoleAsync(sub.UserId, ct);
+
+        await _context.SaveChangesAsync(ct);
+        return Result.Success();
+    }
+
+    public async Task<Result> DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var sub = await _subscriptionRepo.GetByIdAsync(id, ct);
+        if (sub is null)
+            return Result.Failure(new Error("Admin.Subscription.NotFound", "Subscription not found."));
+
+        // Soft delete: Mark as Cancelled
+        sub.Status = SubscriptionStatus.Cancelled;
+        sub.UpdatedAt = DateTime.UtcNow;
+        await _subscriptionRepo.UpdateAsync(sub, ct);
+
+        // Sync role
+        await SyncUserRoleAsync(sub.UserId, ct);
+
+        await _context.SaveChangesAsync(ct);
+        return Result.Success();
+    }
+
+    private async Task SyncUserRoleAsync(Guid userId, CancellationToken ct)
+    {
+        var user = await _userRepository.GetByIdWithRolesAsync(userId, ct);
+        if (user == null) return;
+
+        var premiumRole = await _roleRepository.GetByNameAsync("Premium", ct);
+        if (premiumRole == null) return;
+
+        // Find the latest active subscription to get the correct expiration date
+        var latestActiveSub = (await _subscriptionRepo.GetByUserIdAsync(userId, ct))
+            .Where(s => s.Status == SubscriptionStatus.Active)
+            .OrderByDescending(s => s.EndDate ?? DateTime.MaxValue)
+            .FirstOrDefault();
+
+        var existingUserRole = user.UserRoles.FirstOrDefault(ur => ur.RoleId == premiumRole.Id);
+
+        if (latestActiveSub != null)
+        {
+            // Should have premium role
+            if (existingUserRole == null)
+            {
+                user.UserRoles.Add(new UserRole
+                {
+                    UserId = userId,
+                    RoleId = premiumRole.Id,
+                    AssignedAt = DateTime.UtcNow,
+                    ExpiresAt = latestActiveSub.EndDate
+                });
+            }
+            else
+            {
+                existingUserRole.ExpiresAt = latestActiveSub.EndDate;
+            }
+        }
+        else
+        {
+            // Should NOT have active premium role (or it should be expired)
+            if (existingUserRole != null)
+            {
+                // We set expiration to now so it effectively expires immediately
+                // Alternatively, we could remove the UserRole record, but setting ExpiresAt is safer for history
+                existingUserRole.ExpiresAt = DateTime.UtcNow;
+            }
+        }
+    }

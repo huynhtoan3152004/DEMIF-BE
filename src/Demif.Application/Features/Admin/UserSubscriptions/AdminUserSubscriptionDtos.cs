@@ -66,4 +66,19 @@ public record ExtendSubscriptionRequest(
 
 public record CancelSubscriptionRequest(
     string? Reason
+);public record CreateUserSubscriptionRequest(
+    Guid UserId,
+    Guid PlanId,
+    DateTime StartDate,
+    DateTime? EndDate,
+    SubscriptionStatus Status,
+    bool AutoRenew
+);
+
+public record UpdateUserSubscriptionRequest(
+    Guid PlanId,
+    DateTime StartDate,
+    DateTime? EndDate,
+    SubscriptionStatus Status,
+    bool AutoRenew
 );
