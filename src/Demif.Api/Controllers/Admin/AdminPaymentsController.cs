@@ -10,10 +10,12 @@ namespace Demif.Api.Controllers.Admin;
 public class AdminPaymentsController : ControllerBase
 {
     private readonly AdminPaymentService _paymentService;
+    private readonly GetPaymentStatsService _statsService;
 
-    public AdminPaymentsController(AdminPaymentService paymentService)
+    public AdminPaymentsController(AdminPaymentService paymentService, GetPaymentStatsService statsService)
     {
         _paymentService = paymentService;
+        _statsService = statsService;
     }
 
     /// <summary>
@@ -57,5 +59,17 @@ public class AdminPaymentsController : ControllerBase
         if (result.IsFailure) return BadRequest(new { error = result.Error.Message });
 
         return Ok(new { message = result.Value });
+    }
+
+    /// <summary>
+    /// Thống kê tổng quan doanh thu
+    /// </summary>
+    [HttpGet("stats")]
+    public async Task<IActionResult> GetStats(CancellationToken cancellationToken)
+    {
+        var result = await _statsService.ExecuteAsync(cancellationToken);
+        if (result.IsFailure) return BadRequest(new { error = result.Error.Message });
+
+        return Ok(result.Value);
     }
 }

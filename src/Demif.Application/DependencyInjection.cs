@@ -101,6 +101,7 @@ public static class DependencyInjection
         services.AddScoped<CheckSegmentService>();
         services.AddScoped<CheckShadowingService>();
         services.AddScoped<AdminTranscriptService>();
+        services.AddScoped<Demif.Application.Features.Lessons.Tracking.SyncProgressService>();
 
         // Payment Services
         services.AddScoped<SePayWebhookService>();
@@ -126,12 +127,14 @@ public static class DependencyInjection
         services.AddScoped<GetStatsSummaryService>();
         services.AddScoped<GetActivityHeatmapService>();
         services.AddScoped<GetDailyPracticeService>();
+        services.AddScoped<GetLeaderboardService>();
 
         // Admin User Subscriptions
         services.AddScoped<AdminUserSubscriptionService>();
         
         // Admin Payments
         services.AddScoped<AdminPaymentService>();
+        services.AddScoped<GetPaymentStatsService>();
 
         // Background Job Services
         services.AddScoped<SubscriptionExpiryService>();

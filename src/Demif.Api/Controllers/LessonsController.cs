@@ -2,6 +2,7 @@ using Demif.Application.Abstractions.Services;
 using Demif.Application.Features.Lessons.GetLessonById;
 using Demif.Application.Features.Lessons.GetLessons;
 using Demif.Application.Features.Lessons.GetLessonSegments;
+using Demif.Application.Features.Lessons.Tracking;
 using Demif.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,17 +19,20 @@ public class LessonsController : ControllerBase
     private readonly GetLessonsService _getLessonsService;
     private readonly GetLessonByIdService _getLessonByIdService;
     private readonly GetLessonSegmentsService _getSegmentsService;
+    private readonly SyncProgressService _syncProgressService;
     private readonly ICurrentUserService _currentUserService;
 
     public LessonsController(
         GetLessonsService getLessonsService,
         GetLessonByIdService getLessonByIdService,
         GetLessonSegmentsService getSegmentsService,
+        SyncProgressService syncProgressService,
         ICurrentUserService currentUserService)
     {
         _getLessonsService = getLessonsService;
         _getLessonByIdService = getLessonByIdService;
         _getSegmentsService = getSegmentsService;
+        _syncProgressService = syncProgressService;
         _currentUserService = currentUserService;
     }
 
@@ -103,6 +107,28 @@ public class LessonsController : ControllerBase
                 "Validation" => BadRequest(new { error = result.Error.Message }),
                 _            => BadRequest(new { error = result.Error.Message })
             };
+        }
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Đồng bộ hoá tiến trình của user trong bài học (segment nào đang học / đã hoàn thành).
+    /// </summary>
+    [HttpPost("{id:guid}/sync-progress")]
+    public async Task<IActionResult> SyncProgress(
+        Guid id,
+        [FromBody] SyncProgressRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetUserIdOrNull();
+        if (userId is null) return Unauthorized();
+
+        var result = await _syncProgressService.ExecuteAsync(userId.Value, id, request, cancellationToken);
+        
+        if (result.IsFailure)
+        {
+            return BadRequest(new { error = result.Error.Message });
         }
 
         return Ok(result.Value);

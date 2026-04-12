@@ -20,6 +20,7 @@ public class LoginService
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IApplicationDbContext _dbContext;
     private readonly IConfiguration _configuration;
+    private readonly IUserStreakRepository _streakRepo;
 
     public LoginService(
         IUserRepository userRepository,
@@ -28,7 +29,8 @@ public class LoginService
         IPasswordHasher passwordHasher,
         IJwtTokenService jwtTokenService,
         IApplicationDbContext dbContext,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IUserStreakRepository streakRepo)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
@@ -37,6 +39,7 @@ public class LoginService
         _jwtTokenService = jwtTokenService;
         _dbContext = dbContext;
         _configuration = configuration;
+        _streakRepo = streakRepo;
     }
 
     public async Task<Result<LoginResponse>> ExecuteAsync(
@@ -99,6 +102,9 @@ public class LoginService
 
         // 8. Cập nhật LastLoginAt
         user.LastLoginAt = DateTime.UtcNow;
+
+        // Bổ sung: Cập nhật Streak đăng nhập
+        await UpdateStreakAsync(user.Id, cancellationToken);
         
         // 9. Lưu TẤT CẢ thay đổi 1 LẦN DUY NHẤT
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -115,6 +121,46 @@ public class LoginService
             ExpiresAt = DateTime.UtcNow.AddMinutes(expirationMinutes),
             Roles = roles
         };
+    }
+
+    private async Task UpdateStreakAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var streak = await _streakRepo.GetByUserIdAsync(userId, cancellationToken)
+                     ?? new UserStreak { UserId = userId, FreezesAvailable = 1 };
+
+        var today = DateTime.UtcNow.Date;
+
+        if (streak.LastActiveDate is null)
+        {
+            streak.CurrentStreak = 1;
+            streak.LongestStreak = 1;
+            streak.TotalActiveDays = 1;
+        }
+        else
+        {
+            var lastDate = streak.LastActiveDate.Value.Date;
+
+            if (lastDate == today)
+            {
+                // Unchanged
+            }
+            else if (lastDate == today.AddDays(-1))
+            {
+                streak.CurrentStreak++;
+                streak.TotalActiveDays++;
+                if (streak.CurrentStreak > streak.LongestStreak)
+                    streak.LongestStreak = streak.CurrentStreak;
+            }
+            else
+            {
+                // Gián đoạn, reset khôi phục
+                streak.CurrentStreak = 1;
+                streak.TotalActiveDays++;
+            }
+        }
+
+        streak.LastActiveDate = today;
+        await _streakRepo.UpsertAsync(streak, cancellationToken);
     }
 }
 

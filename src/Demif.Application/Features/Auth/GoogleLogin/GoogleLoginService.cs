@@ -20,19 +20,22 @@ public class GoogleLoginService
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<GoogleLoginService> _logger;
+    private readonly Application.Abstractions.Repositories.IUserStreakRepository _streakRepo;
 
     public GoogleLoginService(
         IGoogleAuthService googleAuth,
         IApplicationDbContext dbContext,
         IJwtTokenService jwtTokenService,
         IConfiguration configuration,
-        ILogger<GoogleLoginService> logger)
+        ILogger<GoogleLoginService> logger,
+        Application.Abstractions.Repositories.IUserStreakRepository streakRepo)
     {
         _googleAuth = googleAuth;
         _dbContext = dbContext;
         _jwtTokenService = jwtTokenService;
         _configuration = configuration;
         _logger = logger;
+        _streakRepo = streakRepo;
     }
 
     public async Task<Result<GoogleLoginResponse>> ExecuteAsync(
@@ -110,6 +113,9 @@ public class GoogleLoginService
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        // Bổ sung: Cập nhật Streak đăng nhập
+        await UpdateStreakAsync(user.Id, cancellationToken);
+
         // 4. Build JWT
         var roles = user.UserRoles
             .Where(ur => ur.Role.IsActive)
@@ -142,6 +148,46 @@ public class GoogleLoginService
             Roles: roles,
             IsNewUser: isNewUser
         ));
+    }
+
+    private async Task UpdateStreakAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var streak = await _streakRepo.GetByUserIdAsync(userId, cancellationToken)
+                     ?? new UserStreak { UserId = userId, FreezesAvailable = 1 };
+
+        var today = DateTime.UtcNow.Date;
+
+        if (streak.LastActiveDate is null)
+        {
+            streak.CurrentStreak = 1;
+            streak.LongestStreak = 1;
+            streak.TotalActiveDays = 1;
+        }
+        else
+        {
+            var lastDate = streak.LastActiveDate.Value.Date;
+
+            if (lastDate == today)
+            {
+                // Unchanged
+            }
+            else if (lastDate == today.AddDays(-1))
+            {
+                streak.CurrentStreak++;
+                streak.TotalActiveDays++;
+                if (streak.CurrentStreak > streak.LongestStreak)
+                    streak.LongestStreak = streak.CurrentStreak;
+            }
+            else
+            {
+                // Gián đoạn, reset khôi phục
+                streak.CurrentStreak = 1;
+                streak.TotalActiveDays++;
+            }
+        }
+
+        streak.LastActiveDate = today;
+        await _streakRepo.UpsertAsync(streak, cancellationToken);
     }
 }
 

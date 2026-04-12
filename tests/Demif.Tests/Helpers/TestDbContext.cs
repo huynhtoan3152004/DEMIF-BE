@@ -23,6 +23,7 @@ public class TestDbContext : DbContext, IApplicationDbContext
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Blog> Blogs => Set<Blog>();
     public DbSet<UserAnalytics> UserAnalytics => Set<UserAnalytics>();
+    public DbSet<UserLessonTracker> UserLessonTrackers => Set<UserLessonTracker>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

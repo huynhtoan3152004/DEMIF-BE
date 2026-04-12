@@ -26,6 +26,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Blog> Blogs { get; set; }
     public DbSet<UserAnalytics> UserAnalytics { get; set; }
+    public DbSet<UserLessonTracker> UserLessonTrackers => Set<UserLessonTracker>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

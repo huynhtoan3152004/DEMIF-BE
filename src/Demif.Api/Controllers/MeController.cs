@@ -34,6 +34,7 @@ public class MeController : ControllerBase
     private readonly GetStatsSummaryService _getStatsSummaryService;
     private readonly GetActivityHeatmapService _getActivityHeatmapService;
     private readonly GetDailyPracticeService _getDailyPracticeService;
+    private readonly GetLeaderboardService _getLeaderboardService;
 
     public MeController(
         GetProgressService getProgressService,
@@ -45,7 +46,8 @@ public class MeController : ControllerBase
         GetUserAnalyticsService getUserAnalyticsService,
         GetStatsSummaryService getStatsSummaryService,
         GetActivityHeatmapService getActivityHeatmapService,
-        GetDailyPracticeService getDailyPracticeService)
+        GetDailyPracticeService getDailyPracticeService,
+        GetLeaderboardService getLeaderboardService)
     {
         _getProgressService = getProgressService;
         _getStreakService = getStreakService;
@@ -57,6 +59,7 @@ public class MeController : ControllerBase
         _getStatsSummaryService = getStatsSummaryService;
         _getActivityHeatmapService = getActivityHeatmapService;
         _getDailyPracticeService = getDailyPracticeService;
+        _getLeaderboardService = getLeaderboardService;
     }
 
     /// <summary>
@@ -284,6 +287,22 @@ public class MeController : ControllerBase
             exerciseType = parsed;
 
         var result = await _getDailyPracticeService.ExecuteAsync(userId, days, exerciseType, ct);
+        if (result.IsFailure)
+            return BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Lấy bảng xếp hạng top 10 người dùng có Streak cao nhất.
+    /// </summary>
+    [HttpGet("stats/leaderboard")]
+    [ProducesResponseType(typeof(List<LeaderboardItemResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetLeaderboard(
+        [FromQuery] int limit = 10,
+        CancellationToken ct = default)
+    {
+        var result = await _getLeaderboardService.ExecuteAsync(limit, ct);
         if (result.IsFailure)
             return BadRequest(new { error = result.Error.Code, message = result.Error.Message });
 
