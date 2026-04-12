@@ -6,7 +6,7 @@ using Demif.Application.Features.Auth.RefreshToken;
 using Demif.Application.Features.Auth.Logout;
 using Demif.Application.Features.Auth.ChangePassword;
 using Demif.Application.Features.Auth.ForgotPassword;
-using Demif.Application.Common.Interfaces;
+using Demif.Application.Abstractions.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 
