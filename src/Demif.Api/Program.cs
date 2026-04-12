@@ -78,7 +78,19 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var pendingMigrations = await dbContext.Database.GetPendingMigrationsAsync();
+
+    if (pendingMigrations.Any())
+    {
+        Log.Information("EF Core pending migrations: {PendingMigrations}", string.Join(", ", pendingMigrations));
+    }
+    else
+    {
+        Log.Information("EF Core has no pending migrations.");
+    }
+
     await dbContext.Database.MigrateAsync();
+    Log.Information("EF Core migrations applied successfully.");
 }
 
 // Enable CORS
