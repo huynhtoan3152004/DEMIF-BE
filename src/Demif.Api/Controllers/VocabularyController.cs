@@ -35,6 +35,34 @@ public class VocabularyController : ControllerBase
         return Ok(result.Value);
     }
 
+    [HttpGet("overview")]
+    public async Task<IActionResult> GetVocabularyOverview(CancellationToken cancellationToken)
+    {
+        if (_currentUserService.UserId is not { } userId)
+            return Unauthorized();
+
+        var result = await _vocabularyService.GetOverviewAsync(userId, cancellationToken);
+        if (result.IsFailure)
+            return BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+
+        return Ok(result.Value);
+    }
+
+    [HttpGet("suggestions")]
+    public async Task<IActionResult> GetVocabularySuggestions([FromQuery] Guid lessonId, [FromQuery] VocabularySuggestionQuery request, CancellationToken cancellationToken)
+    {
+        if (_currentUserService.UserId is not { } userId)
+            return Unauthorized();
+
+        var result = await _vocabularyService.GetSuggestionsAsync(userId, lessonId, request, cancellationToken);
+        if (result.IsFailure)
+            return result.Error.Code == "NotFound"
+                ? NotFound(new { error = result.Error.Code, message = result.Error.Message })
+                : BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+
+        return Ok(result.Value);
+    }
+
     [HttpGet("due")]
     public async Task<IActionResult> GetDueVocabulary([FromQuery] VocabularyQueryRequest request, CancellationToken cancellationToken)
     {

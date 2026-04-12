@@ -44,7 +44,9 @@ Route được mount dưới `/api/me/vocabulary`.
 Các endpoint hiện có:
 
 - `GET /api/me/vocabulary`: lấy danh sách từ vựng của user.
+- `GET /api/me/vocabulary/overview`: lấy dashboard tổng quan của bộ từ vựng.
 - `GET /api/me/vocabulary/due`: lấy các từ đến hạn ôn.
+- `GET /api/me/vocabulary/suggestions?lessonId=...`: lấy gợi ý từ vựng từ transcript của một lesson.
 - `POST /api/me/vocabulary`: lưu hoặc cập nhật một từ vựng.
 - `POST /api/me/vocabulary/{id}/review`: ghi nhận một lần ôn.
 - `DELETE /api/me/vocabulary/{id}`: xoá một từ.
@@ -110,10 +112,68 @@ Các case được cover:
 
 FE có thể dùng feature này để:
 
+- hiển thị dashboard giống Quizlet với tổng số từ, số từ đến hạn, số từ đã mastered và tỷ lệ mastered,
 - bấm lưu từ ngay trên màn lesson/dictation/shadowing,
 - xem danh sách từ theo bài học,
 - lọc theo chủ đề,
 - mở màn ôn tập những từ sắp đến hạn.
+
+### Vocabulary Overview
+
+`GET /api/me/vocabulary/overview`
+
+Response:
+
+```json
+{
+	"totalCount": 24,
+	"dueCount": 5,
+	"masteredCount": 9,
+	"learningCount": 15,
+	"topicCount": 4,
+	"lessonCount": 7,
+	"recentCount": 3,
+	"masteryRate": 37.5,
+	"recentItems": []
+}
+```
+
+### Vocabulary Suggestions
+
+`GET /api/me/vocabulary/suggestions?lessonId=0f8fad5b-d9cb-469f-a165-70867728950e&limit=20`
+
+Response:
+
+```json
+{
+	"lessonId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+	"lessonTitle": "Travel Basics",
+	"lessonCategory": "travel",
+	"topic": "travel",
+	"sourceTextLength": 1240,
+	"totalCandidates": 18,
+	"items": [
+		{
+			"word": "journey",
+			"normalizedWord": "journey",
+			"topic": "travel",
+			"lessonId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+			"lessonTitle": "Travel Basics",
+			"lessonCategory": "travel",
+			"contextSentence": "The journey builds courage.",
+			"frequency": 2,
+			"isAlreadySaved": true
+		}
+	]
+}
+```
+
+FE flow gợi ý:
+
+1. Render 4 card ở đầu trang: total, due, mastered, mastery rate.
+2. Render danh sách recent items để user quay lại từ đã lưu gần đây.
+3. Từ trang lesson, gọi suggestions để show panel "Add to vocabulary".
+4. Mỗi suggestion có thể bắn thẳng `POST /api/me/vocabulary` khi user chọn lưu.
 
 ## Files Chính
 

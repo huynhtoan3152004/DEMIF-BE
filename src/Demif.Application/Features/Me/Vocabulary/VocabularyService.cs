@@ -2,12 +2,28 @@ using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Common.Models;
 using Demif.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using System.Text.RegularExpressions;
 
 namespace Demif.Application.Features.Me.Vocabulary;
 
 public class VocabularyService
 {
     private static readonly int[] ReviewIntervalsInDays = [1, 3, 7, 14, 30];
+    private static readonly string[] SentenceSeparators = [". ", "! ", "? ", "\n"];
+    private static readonly Regex WordRegex = new(@"[A-Za-zÀ-ỹ']+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+    private static readonly HashSet<string> StopWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "the", "and", "for", "with", "that", "this", "from", "have", "has", "are", "was", "were",
+        "you", "your", "our", "their", "they", "them", "there", "here", "when", "what", "where",
+        "which", "will", "would", "could", "should", "about", "into", "over", "under", "then", "than",
+        "also", "just", "like", "been", "being", "very", "more", "most", "such", "some", "each",
+        "many", "much", "who", "whom", "why", "how", "all", "any", "but", "not", "nor", "too",
+        "can", "may", "might", "must", "shall", "hello", "hi", "yes", "no", "ok"
+    };
 
     private readonly IApplicationDbContext _dbContext;
 
@@ -144,6 +160,131 @@ public class VocabularyService
         });
     }
 
+    public async Task<Result<VocabularyOverviewResponse>> GetOverviewAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var weekAgo = now.AddDays(-7);
+
+        var baseQuery = _dbContext.UserVocabularies
+            .AsNoTracking()
+            .Include(x => x.Lesson)
+            .Where(x => x.UserId == userId);
+
+        var totalCount = await baseQuery.CountAsync(cancellationToken);
+        var dueCount = await baseQuery.CountAsync(x => x.NextReviewAt == null || x.NextReviewAt <= now, cancellationToken);
+        var masteredCount = await baseQuery.CountAsync(x => x.IsMastered, cancellationToken);
+        var learningCount = Math.Max(0, totalCount - masteredCount);
+        var topicCount = await baseQuery.Select(x => x.Topic).Distinct().CountAsync(cancellationToken);
+        var lessonCount = await baseQuery.Select(x => x.LessonId).Distinct().CountAsync(cancellationToken);
+        var recentCount = await baseQuery.CountAsync(x => x.CreatedAt >= weekAgo, cancellationToken);
+
+        var recentItems = await baseQuery
+            .OrderByDescending(x => x.CreatedAt)
+            .ThenByDescending(x => x.UpdatedAt)
+            .Take(5)
+            .ToListAsync(cancellationToken);
+
+        return Result.Success(new VocabularyOverviewResponse
+        {
+            TotalCount = totalCount,
+            DueCount = dueCount,
+            MasteredCount = masteredCount,
+            LearningCount = learningCount,
+            TopicCount = topicCount,
+            LessonCount = lessonCount,
+            RecentCount = recentCount,
+            MasteryRate = totalCount > 0 ? Math.Round((decimal)masteredCount / totalCount * 100, 1) : 0,
+            RecentItems = recentItems.Select(item => Map(item)).ToList()
+        });
+    }
+
+    public async Task<Result<VocabularySuggestionResponse>> GetSuggestionsAsync(
+        Guid userId,
+        Guid lessonId,
+        VocabularySuggestionQuery request,
+        CancellationToken cancellationToken = default)
+    {
+        var lesson = await _dbContext.Lessons
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == lessonId, cancellationToken);
+
+        if (lesson is null || lesson.Status != "published")
+            return Result.Failure<VocabularySuggestionResponse>(Error.NotFound("Không tìm thấy bài học."));
+
+        var sourceText = BuildTranscriptSource(lesson);
+        if (string.IsNullOrWhiteSpace(sourceText))
+        {
+            return Result.Failure<VocabularySuggestionResponse>(
+                Error.NotFound("Bài học chưa có transcript để gợi ý từ vựng."));
+        }
+
+        var limit = Math.Clamp(request.Limit, 1, 50);
+        var existingWords = await _dbContext.UserVocabularies
+            .AsNoTracking()
+            .Where(x => x.UserId == userId && x.LessonId == lessonId)
+            .Select(x => x.NormalizedWord)
+            .ToListAsync(cancellationToken);
+
+        var existingSet = existingWords.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var sentences = SplitSentences(sourceText);
+        var suggestionMap = new Dictionary<string, VocabularySuggestionItem>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var sentence in sentences)
+        {
+            foreach (Match match in WordRegex.Matches(sentence))
+            {
+                var word = match.Value.Trim();
+                var normalized = NormalizeWord(word);
+                if (string.IsNullOrWhiteSpace(normalized) || normalized.Length < 3 || StopWords.Contains(normalized))
+                    continue;
+
+                if (suggestionMap.TryGetValue(normalized, out var existing))
+                {
+                    existing.Frequency++;
+                    if (string.IsNullOrWhiteSpace(existing.ContextSentence))
+                        existing.ContextSentence = sentence.Trim();
+                    continue;
+                }
+
+                suggestionMap[normalized] = new VocabularySuggestionItem
+                {
+                    Word = word,
+                    NormalizedWord = normalized,
+                    Frequency = 1,
+                    ContextSentence = sentence.Trim(),
+                    Topic = string.IsNullOrWhiteSpace(lesson.Category) ? lesson.Title : lesson.Category,
+                    LessonId = lesson.Id,
+                    LessonTitle = lesson.Title,
+                    LessonCategory = lesson.Category,
+                    IsAlreadySaved = existingSet.Contains(normalized)
+                };
+            }
+        }
+
+        var rankedSuggestions = suggestionMap.Values.Where(x => x.Frequency >= 2).ToList();
+        if (rankedSuggestions.Count == 0)
+            rankedSuggestions = suggestionMap.Values.ToList();
+
+        var items = rankedSuggestions
+            .OrderByDescending(x => x.Frequency)
+            .ThenBy(x => x.Word)
+            .Take(limit)
+            .ToList();
+
+        return Result.Success(new VocabularySuggestionResponse
+        {
+            LessonId = lesson.Id,
+            LessonTitle = lesson.Title,
+            LessonCategory = lesson.Category,
+            Topic = string.IsNullOrWhiteSpace(lesson.Category) ? lesson.Title : lesson.Category,
+            SourceTextLength = sourceText.Length,
+            TotalCandidates = suggestionMap.Count,
+            Items = items
+        });
+    }
+
     public async Task<Result<VocabularyItemResponse>> ReviewAsync(
         Guid userId,
         Guid vocabularyId,
@@ -204,6 +345,36 @@ public class VocabularyService
             .ToLowerInvariant()
             .Where(char.IsLetterOrDigit)
             .ToArray());
+    }
+
+    private static string BuildTranscriptSource(Lesson lesson)
+    {
+        if (!string.IsNullOrWhiteSpace(lesson.FullTranscript))
+            return lesson.FullTranscript;
+
+        if (string.IsNullOrWhiteSpace(lesson.TimedTranscript))
+            return string.Empty;
+
+        try
+        {
+            var segments = System.Text.Json.JsonSerializer.Deserialize<List<TimedTranscriptSegment>>(lesson.TimedTranscript, JsonOptions);
+            return segments is null || segments.Count == 0
+                ? string.Empty
+                : string.Join(" ", segments.Select(x => x.Text));
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private static IEnumerable<string> SplitSentences(string text)
+    {
+        return text
+            .Replace("\r", " ")
+            .Replace("\n", " ")
+            .Split(SentenceSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(sentence => !string.IsNullOrWhiteSpace(sentence));
     }
 
     private static string? NormalizeOptional(string? input)
@@ -291,4 +462,51 @@ public class VocabularyListResponse
     public int TotalCount { get; set; }
     public int Page { get; set; }
     public int PageSize { get; set; }
+}
+
+public class VocabularyOverviewResponse
+{
+    public int TotalCount { get; set; }
+    public int DueCount { get; set; }
+    public int MasteredCount { get; set; }
+    public int LearningCount { get; set; }
+    public int TopicCount { get; set; }
+    public int LessonCount { get; set; }
+    public int RecentCount { get; set; }
+    public decimal MasteryRate { get; set; }
+    public List<VocabularyItemResponse> RecentItems { get; set; } = new();
+}
+
+public class VocabularySuggestionQuery
+{
+    public int Limit { get; set; } = 20;
+}
+
+public class VocabularySuggestionResponse
+{
+    public Guid LessonId { get; set; }
+    public string LessonTitle { get; set; } = string.Empty;
+    public string? LessonCategory { get; set; }
+    public string Topic { get; set; } = string.Empty;
+    public int SourceTextLength { get; set; }
+    public int TotalCandidates { get; set; }
+    public List<VocabularySuggestionItem> Items { get; set; } = new();
+}
+
+public class VocabularySuggestionItem
+{
+    public string Word { get; set; } = string.Empty;
+    public string NormalizedWord { get; set; } = string.Empty;
+    public string Topic { get; set; } = string.Empty;
+    public Guid LessonId { get; set; }
+    public string LessonTitle { get; set; } = string.Empty;
+    public string? LessonCategory { get; set; }
+    public string? ContextSentence { get; set; }
+    public int Frequency { get; set; }
+    public bool IsAlreadySaved { get; set; }
+}
+
+internal sealed class TimedTranscriptSegment
+{
+    public string Text { get; set; } = string.Empty;
 }

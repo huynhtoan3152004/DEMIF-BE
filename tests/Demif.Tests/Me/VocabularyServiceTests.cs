@@ -158,4 +158,74 @@ public class VocabularyServiceTests
         Assert.NotNull(result.Value.MasteredAt);
         Assert.True(result.Value.NextReviewAt > DateTime.UtcNow);
     }
+
+    [Fact]
+    public async Task GetOverviewAsync_ReturnsAggregatedStatsAndRecentItems()
+    {
+        var context = CreateDbContext();
+        var lesson = CreatePublishedLesson(Guid.NewGuid(), "travel");
+        context.Lessons.Add(lesson);
+
+        context.UserVocabularies.AddRange(
+            new UserVocabulary
+            {
+                UserId = _userId,
+                LessonId = lesson.Id,
+                Topic = "travel",
+                Word = "airport",
+                NormalizedWord = "airport",
+                IsMastered = true,
+                NextReviewAt = DateTime.UtcNow.AddDays(-1)
+            },
+            new UserVocabulary
+            {
+                UserId = _userId,
+                LessonId = lesson.Id,
+                Topic = "travel",
+                Word = "hotel",
+                NormalizedWord = "hotel",
+                NextReviewAt = DateTime.UtcNow.AddDays(-1)
+            });
+
+        await context.SaveChangesAsync();
+
+        var service = new VocabularyService(context);
+        var result = await service.GetOverviewAsync(_userId);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value.TotalCount);
+        Assert.Equal(2, result.Value.DueCount);
+        Assert.Equal(1, result.Value.MasteredCount);
+        Assert.Equal(1, result.Value.LearningCount);
+        Assert.Equal(2, result.Value.RecentItems.Count);
+        Assert.Equal(1, result.Value.TopicCount);
+        Assert.Equal(1, result.Value.LessonCount);
+    }
+
+    [Fact]
+    public async Task GetSuggestionsAsync_ReturnsTranscriptBasedCandidates()
+    {
+        var context = CreateDbContext();
+        var lesson = CreatePublishedLesson(Guid.NewGuid(), "travel");
+        lesson.FullTranscript = "The journey is long. The journey builds courage. Travel opens the mind.";
+        context.Lessons.Add(lesson);
+
+        context.UserVocabularies.Add(new UserVocabulary
+        {
+            UserId = _userId,
+            LessonId = lesson.Id,
+            Topic = "travel",
+            Word = "journey",
+            NormalizedWord = "journey"
+        });
+
+        await context.SaveChangesAsync();
+
+        var service = new VocabularyService(context);
+        var result = await service.GetSuggestionsAsync(_userId, lesson.Id, new VocabularySuggestionQuery { Limit = 5 });
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value.Items);
+        Assert.Contains(result.Value.Items, item => item.NormalizedWord == "journey" && item.IsAlreadySaved);
+    }
 }
