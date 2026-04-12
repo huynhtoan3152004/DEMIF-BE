@@ -45,6 +45,7 @@ using Demif.Application.Features.Me.Stats;
 using Demif.Application.Features.Me.Vocabulary;
 using Demif.Application.Features.Admin.UserSubscriptions;
 using Demif.Application.Features.Admin.Payments;
+using Demif.Application.Features.Admin.Notifications;
 using Demif.Application.Features.Subscriptions.ExpiryCleanup;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -139,6 +140,9 @@ public static class DependencyInjection
         // Admin Payments
         services.AddScoped<AdminPaymentService>();
         services.AddScoped<GetPaymentStatsService>();
+
+        // Admin Notifications
+        services.AddScoped<BroadcastSystemNotificationService>();
         
         // Admin Analytics
         services.AddScoped<Demif.Application.Features.Admin.Analytics.GetAdminAnalyticsService>();

@@ -99,6 +99,11 @@ public static class ApiRoutes
         public const string Cancel = $"{Base}/admin/user-subscriptions/{{id}}/cancel";
     }
 
+    public static class AdminNotifications
+    {
+        public const string Broadcast = $"{Base}/admin/notifications/broadcast";
+    }
+
     public static class AdminBlogs
     {
         public const string Create = $"{Base}/admin/blogs";

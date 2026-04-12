@@ -19,4 +19,15 @@ public interface IEmailService
     /// Gửi email Reset Password với Link Token
     /// </summary>
     Task SendPasswordResetEmailAsync(string toEmail, string username, string resetUrl, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gửi email thông báo hệ thống / ưu đãi cho user.
+    /// </summary>
+    Task SendSystemAnnouncementAsync(
+        string toEmail,
+        string username,
+        string title,
+        string message,
+        string? actionUrl,
+        CancellationToken cancellationToken = default);
 }

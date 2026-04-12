@@ -61,6 +61,20 @@ public class SmtpEmailService : IEmailService
         _logger.LogInformation("Password reset email sent to {Email}", toEmail);
     }
 
+    public async Task SendSystemAnnouncementAsync(
+      string toEmail,
+      string username,
+      string title,
+      string message,
+      string? actionUrl,
+      CancellationToken cancellationToken = default)
+    {
+      var subject = $"[DEMIF] {title}";
+      var body = BuildSystemAnnouncementEmailHtml(username, title, message, actionUrl);
+      await SendAsync(toEmail, subject, body);
+      _logger.LogInformation("System announcement sent to {Email}", toEmail);
+    }
+
     private async Task SendAsync(string toEmail, string subject, string htmlBody)
     {
         using var client = new SmtpClient(_host, _port)
@@ -136,6 +150,45 @@ public class SmtpEmailService : IEmailService
             <p style="color: #94a3b8; font-size: 13px;">Nếu bạn không yêu cầu đổi mật khẩu, vui lòng bỏ qua email này. Tài khoản của bạn vẫn an toàn.</p>
             <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
             <p style="color: #cbd5e1; font-size: 12px; text-align: center;">© 2025 DEMIF App</p>
+          </div>
+        </body>
+        </html>
+        """;
+    }
+
+    private static string BuildSystemAnnouncementEmailHtml(string username, string title, string message, string? actionUrl)
+    {
+        var safeUsername = WebUtility.HtmlEncode(username);
+        var safeTitle = WebUtility.HtmlEncode(title);
+        var safeMessage = WebUtility.HtmlEncode(message)
+            .Replace("\r\n", "<br />")
+            .Replace("\n", "<br />");
+        var actionButton = string.IsNullOrWhiteSpace(actionUrl)
+            ? string.Empty
+            : $$"""
+              <div style="text-align: center; margin: 32px 0;">
+                <a href="{{WebUtility.HtmlEncode(actionUrl)}}"
+                   style="background: #2563eb; color: white; padding: 14px 32px; border-radius: 8px;
+                          text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">
+                  Xem ngay
+                </a>
+              </div>
+              """;
+
+        return $$"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
+          <div style="background: white; border-radius: 12px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+            <h1 style="color: #2563eb; margin-bottom: 8px;">🎧 DEMIF</h1>
+            <h2 style="color: #1e293b; margin-bottom: 8px;">{{safeTitle}}</h2>
+            <p style="color: #64748b;">Xin chào <strong>{{safeUsername}}</strong>,</p>
+            <p style="color: #64748b; line-height: 1.7;">{{safeMessage}}</p>
+            {{actionButton}}
+            <p style="color: #94a3b8; font-size: 13px;">Đây là thông báo tự động từ hệ thống DEMIF.</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+            <p style="color: #cbd5e1; font-size: 12px; text-align: center;">© 2026 DEMIF App</p>
           </div>
         </body>
         </html>

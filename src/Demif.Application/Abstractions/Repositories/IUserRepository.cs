@@ -36,5 +36,10 @@ public interface IUserRepository : IGenericRepository<User>
     /// Tìm kiếm users theo email hoặc username
     /// </summary>
     Task<IEnumerable<User>> SearchAsync(string searchTerm, int maxResults = 10, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lấy danh sách user có thể nhận thông báo hệ thống.
+    /// </summary>
+    Task<IEnumerable<User>> GetBroadcastRecipientsAsync(CancellationToken cancellationToken = default);
 }
 

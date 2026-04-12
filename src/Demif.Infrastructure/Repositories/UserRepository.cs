@@ -102,5 +102,16 @@ public class UserRepository : GenericRepository<User>, IUserRepository
             .Take(maxResults)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IEnumerable<User>> GetBroadcastRecipientsAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Where(u =>
+                !string.IsNullOrWhiteSpace(u.Email) &&
+                u.Status != UserStatus.Banned &&
+                u.Status != UserStatus.Suspended)
+            .OrderBy(u => u.Email)
+            .ToListAsync(cancellationToken);
+    }
 }
 
