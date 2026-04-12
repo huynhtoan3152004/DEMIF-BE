@@ -13,6 +13,7 @@ public interface IApplicationDbContext
     DbSet<UserExercise> UserExercises { get; }
     DbSet<UserProgress> UserProgresses { get; }
     DbSet<UserStreak> UserStreaks { get; }
+    DbSet<SubscriptionPlan> SubscriptionPlans { get; }
     DbSet<UserSubscription> UserSubscriptions { get; }
     DbSet<Payment> Payments { get; }
     DbSet<Role> Roles { get; }

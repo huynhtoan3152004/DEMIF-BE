@@ -68,6 +68,8 @@ public static class DependencyInjection
         services.AddScoped<RefreshTokenService>();
         services.AddScoped<LogoutService>();
         services.AddScoped<ChangePasswordService>();
+        services.AddScoped<Demif.Application.Features.Auth.ForgotPassword.ForgotPasswordService>();
+        services.AddScoped<Demif.Application.Features.Auth.ForgotPassword.ResetPasswordService>();
 
         // User Management Services (Admin)
         services.AddScoped<GetUsersService>();
@@ -135,6 +137,9 @@ public static class DependencyInjection
         // Admin Payments
         services.AddScoped<AdminPaymentService>();
         services.AddScoped<GetPaymentStatsService>();
+        
+        // Admin Analytics
+        services.AddScoped<Demif.Application.Features.Admin.Analytics.GetAdminAnalyticsService>();
 
         // Background Job Services
         services.AddScoped<SubscriptionExpiryService>();

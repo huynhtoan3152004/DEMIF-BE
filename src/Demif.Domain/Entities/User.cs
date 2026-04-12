@@ -30,6 +30,10 @@ public class User : AuditableEntity
     public string? EmailVerificationToken { get; set; }
     public DateTime? EmailVerificationExpiry { get; set; }
 
+    // Password Reset
+    public string? PasswordResetToken { get; set; }
+    public DateTime? PasswordResetExpiry { get; set; }
+
     // Settings (JSON)
     public string? Settings { get; set; }
 

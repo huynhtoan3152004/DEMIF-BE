@@ -1,67 +1,161 @@
-# Tài Liệu Cập Nhật API (Tính Năng Mới)
+# TÀI LIỆU API: CÁC TÍNH NĂNG ENGAGEMENT, ADMIN & AUTH SECURITY
 
-## 1. Leaderboard & Streak
+Tài liệu này bao gồm danh sách chi tiết các Endpoint, định dạng JSON Request/Response, cách xử lý luồng (flow) và các mã lỗi (Errors) thường gặp để Frontend Team tích hợp.
 
-- **Tính Năng Đăng Nhập Tự Động Tăng Streak**: Tính năng này chạy ngầm phía server. Mỗi khi FE gọi `POST /api/auth/login` hoặc `POST /api/auth/google-login`, Backend tự động cập nhật Streak của User tại thời điểm đó nếu khác ngày. Không cần thay đổi từ phía FE cho 2 API này.
-  
-### Lấy bảng xếp hạng
-- **URL**: `GET /api/me/stats/leaderboard`
-- **Auth**: Cần `Bearer Token`.
-- **Query Params**: `limit` (int, default = 10). Mặc định lấy top 10.
-- **Response**:
+---
+
+## 🚀 1. LUỒNG THÔNG TIN STREAK & LEADERBOARD
+
+### 1.1 Tự động cộng Streak khi Login (Đã được xử lý ngầm)
+- **APIs ảnh hưởng:** 
+  - `POST /api/auth/login`
+  - `POST /api/auth/google-login`
+- **Frontend Flow:** Bạn không cần thay đổi bất kỳ body payload nào. Cứ mỗi khi gọi 2 API này thành công, Backend sẽ tự động kiểm tra xem ngày hôm nay người dùng đã Login chưa. Nếu chưa đăng nhập trong ngày (chuẩn UTC), Backend sẽ tự động tăng mốc Chuỗi ngày học liên tiếp (Current Streak) lên +1. Nếu bỏ lỡ ngày hôm qua, hệ thống sẽ reset về 1.
+
+### 1.2 Xem Bảng Xếp Hạng (Leaderboard)
+Lấy top User có `Streak` cao nhất hệ thống. Dùng để render Cúp/Bảng vinh danh.
+- **Endpoint:** `GET /api/me/stats/leaderboard`
+- **Auth:** Require `Bearer Token`
+- **Query Params:** 
+  - `limit` (int, default = 10): Số lượng người trong top cần lấy.
+- **Response (200 OK):**
 ```json
 [
   {
-    "userId": "guid",
-    "username": "Nguyen Van A",
-    "avatarUrl": "https://...",
-    "currentStreak": 15,
-    "totalPoints": 5000,
-    "level": "Advanced"
+    "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "username": "DavidNguyen",
+    "avatarUrl": "https://example.com/avatar.png",
+    "currentStreak": 15,    // Dùng để so sánh top
+    "totalPoints": 4500,    // Chỉ số phụ trong trường hợp bằng nhau
+    "level": "Intermediate" // Hiển thị badge Level cạnh username
   }
 ]
 ```
+- **Lỗi có thể gặp:** 
+  - `401 Unauthorized` nếu token hết hạn.
 
-## 2. Lesson Progress Tracker
+---
 
-Tính năng theo dõi xem user học tới đâu (cụ thể hỗ trợ ngắt quãng và quay lại bài nghe).
+## 🎧 2. LUỒNG ĐỒNG BỘ BÀI HỌC (LESSON TRACKER)
 
-### Cập nhật / Đồng bộ tiến trình bài học (Save Progress)
-- **Hành vi**: Gọi liên tục khi chuyển đoạn (segment) hoặc khi user pause, hoặc gọi định kỳ (5-10s/lần) lúc đang làm bài. FE không nhất thiết gửi nguyên dictation answers.
-- **URL**: `POST /api/lessons/{id}/sync-progress`
-- **Auth**: Cần `Bearer Token`.
-- **Body Request**:
+Giúp User nghe hay làm bài dở dang vẫn có thể quay lại học tiếp ở đoạn cũ. 
+
+### 2.1 Cập nhật tiến độ bài học
+- **Flow Logic:** FE nên gọi API này khi User: Chuyển đoạn nghe (Segment), Tạm dừng / Thoát ra khỏi giao diện học, hoặc Gõ hoàn thành đúng 1 cầu. Khuyên dùng cơ chế *Debounce* (Ví dụ: 5s gọi 1 lần để tránh Spam API).
+- **Endpoint:** `POST /api/lessons/{id}/sync-progress`
+  *(Trong đó `{id}` là ID của Lesson đang học)*
+- **Auth:** Require `Bearer Token`
+- **Request Body:**
 ```json
 {
-  "segmentIndex": 2, // Index của đoạn đang nghe dở hoặc đã làm
-  "isCompleted": false // Chuyền true nếu user nhấn Next/Hoàn thành tới cuối bài
+  "segmentIndex": 3,     // Vị trí (Index) đoạn Audio/Video đang dừng lại
+  "isCompleted": false   // Bằng true khi User bấm Kết Thúc bài, bằng false nếu đang học dở
 }
 ```
-- **Response** (200 OK):
+- **Response (200 OK):**
 ```json
 {
-  "userId": "guid",
-  "lessonId": "guid",
-  "status": "InProgress", // Started, InProgress, Completed
-  "lastSegmentIndex": 2
+  "userId": "3fa85f64...",
+  "lessonId": "b1b85f64...",
+  "status": "InProgress", // Sẽ trả về "Completed" nếu truyền isCompleted: true
+  "lastSegmentIndex": 3
 }
 ```
+- **Lỗi có thể gặp:**
+  - `400 Bad Request`: `{ "error": "Lesson.NotFound", "message": "Không tìm thấy bài học này." }` (URL truyền sai ID của lesson).
 
-## 3. Thống Kê Giao Dịch (Admin)
+---
 
-### Tổng quan thống kê doanh thu
-- **URL**: `GET /api/admin/payments/stats`
-- **Auth**: Cần `Bearer Token` với Role `Admin`.
-- **Response**:
+## 🔒 3. LUỒNG QUÊN MẬT KHẨU (FORGOT PASSWORD) TRẢ QUA MAIL
+
+### 3.1 Yêu cầu gửi Link đặt lại mật khẩu
+- **Flow Logic:** User gõ email vào màn hình Quên Mật Khẩu trên UI. Bấm Gửi. Do tính chất bảo mật, API luôn báo thành công ngay cả khi email tào lao (để chống việc Hacker dùng màn hình này dò xem Email nào có xài app).
+- **Endpoint:** `POST /api/auth/forgot-password`
+- **Auth:** API Public (Không cần Token)
+- **Request Body:**
 ```json
 {
-  "totalRevenue": 20000000, 
-  "currentMonthRevenue": 5000000,
-  "totalTransactions": 150,
-  "currency": "VND"
+  "email": "user@example.com"
+}
+```
+- **Response (200 OK):**
+```json
+{
+  "message": "Nếu email hợp lệ, link lấy lại mật khẩu đã được gửi."
 }
 ```
 
-## 4. Danh sách người dùng đăng ký (Admin)
-- Tính năng này đã tồn tại ở **URL**: `GET /api/admin/users`.
-- Hỗ trợ gọi với Query Param truyền vào (search, filter, page, pageSize, v.v.).
+### 3.2 Nhập mật khẩu mới sau khi bấm vào Link ở Email
+- **Flow Logic:** Trong hộp thư của hệ thống DEMIF gửi về sẽ có 1 đường Link: `http://{frontend-url}/reset-password?token=XYZ...`
+  - FE lấy cục Token `XYZ` từ url.
+  - Sau đó cho User nhập `newPassword`. Rồi nã xuống API bên dưới.
+  - Thành công thì yêu cầu chuyển hướng về màn hình Login để đăng nhập lại.
+- **Endpoint:** `POST /api/auth/reset-password`
+- **Auth:** API Public (Không cần Token)
+- **Request Body:**
+```json
+{
+  "token": "Mã_Lấy_Từ_Param_URL",
+  "newPassword": "123PasswordMoi@!"
+}
+```
+- **Response (200 OK):**
+```json
+{
+  "message": "Khôi phục mật khẩu thành công. Vui lòng đăng nhập lại."
+}
+```
+- **Lỗi có thể gặp:**
+  - `400 Bad Request`: `{ "error": "Link đổi mật khẩu đã hết hạn hoặc không hợp lệ." }` -> Yêu cầu người dùng bấm Forgot Password lại từ đầu do qua 15 phút.
+
+---
+
+## 👨‍💼 4. ADMINISTRATION (CHỈ DÀNH CHO ROLE ADMIN)
+
+Hiển thị hệ thống Thống kê chuyên sâu làm biểu đồ tại trang Dashboard.
+
+### 4.1 Lấy toàn bộ Analytics cho Dashboard
+- **Endpoint:** `GET /api/admin/analytics`
+- **Auth:** Require `Bearer Token` (Role = `Admin`)
+- **Response (200 OK):**
+```json
+{
+  "dailyActiveUsers": 142,      // Người truy cập (Đăng nhập) trong hôm nay
+  "monthlyActiveUsers": 500,    // Trong tháng hiện tại
+  "totalUsers": 1500,           // Toàn hệ thống
+  "difficultLessons": [         // Top 5 Bài học bị đánh rớt nhiều / điểm lè tè
+    {
+      "lessonId": "b1b85f64...",
+      "title": "Business Negotiation 01",
+      "avgScore": 2.5,          // Điểm làm bài quá lẹt đẹt
+      "completionsCount": 50
+    }
+  ],
+  "popularLessons": [           // Top 5 Bài học được mến mộ luyện đi luyện lại
+    {
+      "lessonId": "b1b222...",
+      "title": "Daily Greeting",
+      "avgScore": 8.0,
+      "completionsCount": 350   // Hoàn thành cả ngàn lần
+    }
+  ],
+  "revenueStats": {
+    "totalRevenue": 20000000, 
+    "premiumRevenue": 15000000, // Doanh thu đến từ Cán mốc gói xịn Premium
+    "proRevenue": 5000000,      // Gói Pro rải rác
+    "otherRevenue": 0
+  }
+}
+```
+- **Lỗi:**
+  - `403 Forbidden` nểu Tài khoản gọi API không phải Admin.
+
+### 4.2 Lấy danh sách Người Cài Đặt (List Users)
+- **Endpoint:** `GET /api/admin/users`
+- **Query Params:**
+  - `page` (default: 1)
+  - `pageSize` (default: 20)
+  - `search` (Tên hoặc email)
+  - `status` (Active / Banned)
+  - `role` (ví dụ: User, Admin)
+- **Response:** (Đã có sẵn dạng phân trang Pagination).

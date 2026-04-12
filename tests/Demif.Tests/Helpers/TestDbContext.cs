@@ -16,6 +16,7 @@ public class TestDbContext : DbContext, IApplicationDbContext
     public DbSet<UserExercise> UserExercises => Set<UserExercise>();
     public DbSet<UserProgress> UserProgresses => Set<UserProgress>();
     public DbSet<UserStreak> UserStreaks => Set<UserStreak>();
+    public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
     public DbSet<UserSubscription> UserSubscriptions => Set<UserSubscription>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Role> Roles => Set<Role>();

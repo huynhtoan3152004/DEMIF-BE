@@ -51,6 +51,16 @@ public class SmtpEmailService : IEmailService
         _logger.LogInformation("Verification email resent to {Email}", toEmail);
     }
 
+    public async Task SendPasswordResetEmailAsync(
+        string toEmail, string username, string resetUrl,
+        CancellationToken cancellationToken = default)
+    {
+        var subject = "🔒 Yêu cầu Lấy lại mật khẩu DEMIF";
+        var body = BuildPasswordResetEmailHtml(username, resetUrl);
+        await SendAsync(toEmail, subject, body);
+        _logger.LogInformation("Password reset email sent to {Email}", toEmail);
+    }
+
     private async Task SendAsync(string toEmail, string subject, string htmlBody)
     {
         using var client = new SmtpClient(_host, _port)
@@ -95,6 +105,35 @@ public class SmtpEmailService : IEmailService
             </div>
             <p style="color: #94a3b8; font-size: 13px;">Link có hiệu lực trong <strong>24 giờ</strong>.</p>
             <p style="color: #94a3b8; font-size: 13px;">Nếu bạn không đăng ký tài khoản này, hãy bỏ qua email này.</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+            <p style="color: #cbd5e1; font-size: 12px; text-align: center;">© 2025 DEMIF App</p>
+          </div>
+        </body>
+        </html>
+        """;
+    }
+
+    private static string BuildPasswordResetEmailHtml(string username, string resetUrl)
+    {
+        return $"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
+          <div style="background: white; border-radius: 12px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+            <h1 style="color: #2563eb; margin-bottom: 8px;">🎧 DEMIF</h1>
+            <h2 style="color: #1e293b;">Yêu cầu Khôi phục mật khẩu</h2>
+            <p style="color: #64748b;">Xin chào <strong>{username}</strong>,</p>
+            <p style="color: #64748b;">Hệ thống nhận được yêu cầu lấy lại mật khẩu cho tài khoản DEMIF của bạn. Vui lòng bấm vào nút dưới đây để thiết lập mật khẩu mới.</p>
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="{resetUrl}"
+                 style="background: #ef4444; color: white; padding: 14px 32px; border-radius: 8px;
+                        text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">
+                Đổi Mật Khẩu
+              </a>
+            </div>
+            <p style="color: #94a3b8; font-size: 13px;">Link có hiệu lực trong <strong>15 phút</strong>.</p>
+            <p style="color: #94a3b8; font-size: 13px;">Nếu bạn không yêu cầu đổi mật khẩu, vui lòng bỏ qua email này. Tài khoản của bạn vẫn an toàn.</p>
             <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
             <p style="color: #cbd5e1; font-size: 12px; text-align: center;">© 2025 DEMIF App</p>
           </div>

@@ -14,4 +14,9 @@ public interface IEmailService
     /// Gửi lại email xác nhận (resend)
     /// </summary>
     Task ResendEmailVerificationAsync(string toEmail, string username, string verifyUrl, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gửi email Reset Password với Link Token
+    /// </summary>
+    Task SendPasswordResetEmailAsync(string toEmail, string username, string resetUrl, CancellationToken cancellationToken = default);
 }
