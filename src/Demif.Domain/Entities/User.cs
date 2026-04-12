@@ -47,4 +47,5 @@ public class User : AuditableEntity
     public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public virtual ICollection<UserSubscription> Subscriptions { get; set; } = new List<UserSubscription>();
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
+    public virtual ICollection<UserVocabulary> Vocabularies { get; set; } = new List<UserVocabulary>();
 }

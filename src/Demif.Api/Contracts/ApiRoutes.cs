@@ -88,6 +88,7 @@ public static class ApiRoutes
         public const string GetProgress = $"{Base}/me/progress";
         public const string GetStreak = $"{Base}/me/streak";
         public const string RecordActivity = $"{Base}/me/activity";
+        public const string Vocabulary = $"{Base}/me/vocabulary";
     }
 
     public static class AdminUserSubscriptions

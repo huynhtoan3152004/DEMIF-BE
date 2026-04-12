@@ -42,6 +42,7 @@ using Demif.Application.Features.Me.GetStreak;
 using Demif.Application.Features.Me.RecordActivity;
 using Demif.Application.Features.Me.GetUserAnalytics;
 using Demif.Application.Features.Me.Stats;
+using Demif.Application.Features.Me.Vocabulary;
 using Demif.Application.Features.Admin.UserSubscriptions;
 using Demif.Application.Features.Admin.Payments;
 using Demif.Application.Features.Subscriptions.ExpiryCleanup;
@@ -130,6 +131,7 @@ public static class DependencyInjection
         services.AddScoped<GetActivityHeatmapService>();
         services.AddScoped<GetDailyPracticeService>();
         services.AddScoped<GetLeaderboardService>();
+        services.AddScoped<VocabularyService>();
 
         // Admin User Subscriptions
         services.AddScoped<AdminUserSubscriptionService>();

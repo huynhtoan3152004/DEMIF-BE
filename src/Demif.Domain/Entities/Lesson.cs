@@ -71,4 +71,5 @@ public class Lesson : AuditableEntity
 
     // Navigation
     public virtual ICollection<UserExercise> Exercises { get; set; } = new List<UserExercise>();
+    public virtual ICollection<UserVocabulary> Vocabularies { get; set; } = new List<UserVocabulary>();
 }

@@ -25,6 +25,7 @@ public class TestDbContext : DbContext, IApplicationDbContext
     public DbSet<Blog> Blogs => Set<Blog>();
     public DbSet<UserAnalytics> UserAnalytics => Set<UserAnalytics>();
     public DbSet<UserLessonTracker> UserLessonTrackers => Set<UserLessonTracker>();
+    public DbSet<UserVocabulary> UserVocabularies => Set<UserVocabulary>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
