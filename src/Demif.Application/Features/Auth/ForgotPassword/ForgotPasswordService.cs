@@ -28,11 +28,12 @@ public class ForgotPasswordService
 
     public async Task<Result> ExecuteAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default)
     {
-        var user = await _userRepository.GetByEmailAsync(request.Email, cancellationToken);
+        var email = request.Email.Trim().ToLowerInvariant();
+        var user = await _userRepository.GetByEmailAsync(email, cancellationToken);
         
         // Trick bảo mật: Báo thành công bất kể có tìm thấy user hay không
         // Giúp chống lộ lọt email (Email enumeration attack)
-        if (user == null || user.AuthProvider != "email")
+        if (user == null)
         {
             return Result.Success();
         }

@@ -53,7 +53,7 @@ public class ForgotPasswordServiceTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenUserIsGoogleOauth_ShouldReturnSuccess_WithoutSendingEmail()
+    public async Task ExecuteAsync_WhenUserIsGoogleOauth_ShouldSendResetEmail()
     {
         // Arrange
         var user = new User { Email = "google@example.com", AuthProvider = "google" };
@@ -67,7 +67,10 @@ public class ForgotPasswordServiceTests
 
         // Assert
         Assert.True(result.IsSuccess);
-        _mockEmailService.Verify(x => x.SendPasswordResetEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.NotNull(user.PasswordResetToken);
+        Assert.NotNull(user.PasswordResetExpiry);
+        _mockDbContext.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _mockEmailService.Verify(x => x.SendPasswordResetEmailAsync("google@example.com", It.IsAny<string>(), It.Is<string>(url => url.Contains("reset-password?token=")), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
