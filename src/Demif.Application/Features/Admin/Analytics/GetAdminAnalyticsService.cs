@@ -16,8 +16,8 @@ public class GetAdminAnalyticsService
 
     public async Task<Result<AdminAnalyticsResponse>> ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        var today = DateTime.UtcNow.Date;
-        var firstDayOfMonth = new DateTime(today.Year, today.Month, 1);
+        var today = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
+        var firstDayOfMonth = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc);
 
         // 1. User Metrics (DAU/MAU) using User.LastLoginAt
         var dau = await _dbContext.Users
