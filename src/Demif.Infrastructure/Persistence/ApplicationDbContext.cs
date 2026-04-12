@@ -28,6 +28,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<UserAnalytics> UserAnalytics { get; set; }
     public DbSet<UserLessonTracker> UserLessonTrackers => Set<UserLessonTracker>();
     public DbSet<UserVocabulary> UserVocabularies => Set<UserVocabulary>();
+    public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

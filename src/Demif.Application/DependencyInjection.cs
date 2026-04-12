@@ -39,6 +39,7 @@ using Demif.Application.Features.Blogs.UpdateBlog;
 using Demif.Application.Features.Blogs.DeleteBlog;
 using Demif.Application.Features.Me.GetProgress;
 using Demif.Application.Features.Me.GetStreak;
+using Demif.Application.Features.Me.Notifications;
 using Demif.Application.Features.Me.RecordActivity;
 using Demif.Application.Features.Me.GetUserAnalytics;
 using Demif.Application.Features.Me.Stats;
@@ -126,6 +127,10 @@ public static class DependencyInjection
         services.AddScoped<GetStreakService>();
         services.AddScoped<RecordActivityService>();
         services.AddScoped<GetUserAnalyticsService>();
+        services.AddScoped<GetMyNotificationsService>();
+        services.AddScoped<GetUnreadNotificationCountService>();
+        services.AddScoped<MarkNotificationAsReadService>();
+        services.AddScoped<MarkAllNotificationsAsReadService>();
 
         // Stats endpoints (Thống kê)
         services.AddScoped<GetStatsSummaryService>();

@@ -89,6 +89,13 @@ public static class ApiRoutes
         public const string GetStreak = $"{Base}/me/streak";
         public const string RecordActivity = $"{Base}/me/activity";
         public const string Vocabulary = $"{Base}/me/vocabulary";
+        public static class Notifications
+        {
+            public const string GetAll = $"{Base}/me/notifications";
+            public const string GetUnreadCount = $"{Base}/me/notifications/unread-count";
+            public const string MarkAsRead = $"{Base}/me/notifications/{{id}}/read";
+            public const string ReadAll = $"{Base}/me/notifications/read-all";
+        }
     }
 
     public static class AdminUserSubscriptions

@@ -23,6 +23,7 @@ public interface IApplicationDbContext
     DbSet<UserAnalytics> UserAnalytics { get; }
     DbSet<UserLessonTracker> UserLessonTrackers { get; }
     DbSet<UserVocabulary> UserVocabularies { get; }
+    DbSet<UserNotification> UserNotifications { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

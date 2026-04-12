@@ -43,6 +43,7 @@ public class User : AuditableEntity
     public virtual UserProgress? Progress { get; set; }
     public virtual UserStreak? Streak { get; set; }
     public virtual ICollection<UserExercise> Exercises { get; set; } = new List<UserExercise>();
+    public virtual ICollection<UserNotification> Notifications { get; set; } = new List<UserNotification>();
     public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public virtual ICollection<UserSubscription> Subscriptions { get; set; } = new List<UserSubscription>();

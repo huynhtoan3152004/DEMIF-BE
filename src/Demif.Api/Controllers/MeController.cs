@@ -1,6 +1,7 @@
 using Demif.Application.Abstractions.Services;
 using Demif.Application.Features.Me.GetProgress;
 using Demif.Application.Features.Me.GetStreak;
+using Demif.Application.Features.Me.Notifications;
 using Demif.Application.Features.Me.RecordActivity;
 using Demif.Application.Features.Me.GetUserAnalytics;
 using Demif.Application.Features.Me.Stats;
@@ -35,6 +36,10 @@ public class MeController : ControllerBase
     private readonly GetActivityHeatmapService _getActivityHeatmapService;
     private readonly GetDailyPracticeService _getDailyPracticeService;
     private readonly GetLeaderboardService _getLeaderboardService;
+    private readonly GetMyNotificationsService _getMyNotificationsService;
+    private readonly GetUnreadNotificationCountService _getUnreadNotificationCountService;
+    private readonly MarkNotificationAsReadService _markNotificationAsReadService;
+    private readonly MarkAllNotificationsAsReadService _markAllNotificationsAsReadService;
 
     public MeController(
         GetProgressService getProgressService,
@@ -47,7 +52,11 @@ public class MeController : ControllerBase
         GetStatsSummaryService getStatsSummaryService,
         GetActivityHeatmapService getActivityHeatmapService,
         GetDailyPracticeService getDailyPracticeService,
-        GetLeaderboardService getLeaderboardService)
+        GetLeaderboardService getLeaderboardService,
+        GetMyNotificationsService getMyNotificationsService,
+        GetUnreadNotificationCountService getUnreadNotificationCountService,
+        MarkNotificationAsReadService markNotificationAsReadService,
+        MarkAllNotificationsAsReadService markAllNotificationsAsReadService)
     {
         _getProgressService = getProgressService;
         _getStreakService = getStreakService;
@@ -60,6 +69,10 @@ public class MeController : ControllerBase
         _getActivityHeatmapService = getActivityHeatmapService;
         _getDailyPracticeService = getDailyPracticeService;
         _getLeaderboardService = getLeaderboardService;
+        _getMyNotificationsService = getMyNotificationsService;
+        _getUnreadNotificationCountService = getUnreadNotificationCountService;
+        _markNotificationAsReadService = markNotificationAsReadService;
+        _markAllNotificationsAsReadService = markAllNotificationsAsReadService;
     }
 
     /// <summary>
@@ -143,6 +156,78 @@ public class MeController : ControllerBase
             return Unauthorized();
 
         var result = await _getPaymentHistoryService.ExecuteAsync(userId, ct);
+        if (result.IsFailure)
+            return BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Get my notifications inbox.
+    /// </summary>
+    [HttpGet("notifications")]
+    [ProducesResponseType(typeof(GetMyNotificationsResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetNotifications(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken ct = default)
+    {
+        if (_currentUserService.UserId is not { } userId)
+            return Unauthorized();
+
+        var result = await _getMyNotificationsService.ExecuteAsync(userId, page, pageSize, ct);
+        if (result.IsFailure)
+            return BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Get unread notification count for badge display.
+    /// </summary>
+    [HttpGet("notifications/unread-count")]
+    [ProducesResponseType(typeof(UnreadNotificationCountResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetUnreadNotificationCount(CancellationToken ct = default)
+    {
+        if (_currentUserService.UserId is not { } userId)
+            return Unauthorized();
+
+        var result = await _getUnreadNotificationCountService.ExecuteAsync(userId, ct);
+        if (result.IsFailure)
+            return BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Mark a notification as read.
+    /// </summary>
+    [HttpPatch("notifications/{id:guid}/read")]
+    [ProducesResponseType(typeof(MarkNotificationAsReadResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> MarkNotificationAsRead(Guid id, CancellationToken ct = default)
+    {
+        if (_currentUserService.UserId is not { } userId)
+            return Unauthorized();
+
+        var result = await _markNotificationAsReadService.ExecuteAsync(userId, id, ct);
+        if (result.IsFailure)
+            return NotFound(new { error = result.Error.Code, message = result.Error.Message });
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Mark all notifications as read.
+    /// </summary>
+    [HttpPost("notifications/read-all")]
+    [ProducesResponseType(typeof(MarkAllNotificationsAsReadResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ReadAllNotifications(CancellationToken ct = default)
+    {
+        if (_currentUserService.UserId is not { } userId)
+            return Unauthorized();
+
+        var result = await _markAllNotificationsAsReadService.ExecuteAsync(userId, ct);
         if (result.IsFailure)
             return BadRequest(new { error = result.Error.Code, message = result.Error.Message });
 

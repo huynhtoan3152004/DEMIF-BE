@@ -3,6 +3,8 @@ using Demif.Application.Abstractions.Services;
 using Demif.Application.Features.Admin.Notifications;
 using Demif.Domain.Entities;
 using Demif.Domain.Enums;
+using Demif.Tests.Helpers;
+using Microsoft.EntityFrameworkCore;
 using Moq;
 
 namespace Demif.Tests.Admin;
@@ -11,15 +13,18 @@ public class BroadcastSystemNotificationServiceTests
 {
     private readonly Mock<IUserRepository> _userRepositoryMock;
     private readonly Mock<IEmailService> _emailServiceMock;
+    private readonly TestDbContext _context;
     private readonly BroadcastSystemNotificationService _service;
 
     public BroadcastSystemNotificationServiceTests()
     {
         _userRepositoryMock = new Mock<IUserRepository>();
         _emailServiceMock = new Mock<IEmailService>();
+        _context = CreateDbContext();
 
         _service = new BroadcastSystemNotificationService(
             _userRepositoryMock.Object,
+            _context,
             _emailServiceMock.Object,
             Mock.Of<Microsoft.Extensions.Logging.ILogger<BroadcastSystemNotificationService>>());
     }
@@ -43,16 +48,16 @@ public class BroadcastSystemNotificationServiceTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_DeduplicatesEmailsAndSendsAnnouncement()
+    public async Task ExecuteAsync_PersistsInboxNotifications_AndSendsAnnouncement()
     {
         _userRepositoryMock
             .Setup(r => r.GetBroadcastRecipientsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[]
             {
                 BuildUser("user1@example.com", "User 1", UserStatus.Active),
-                BuildUser("user1@example.com", "User 1 Duplicate", UserStatus.Inactive),
                 BuildUser("user2@example.com", "User 2", UserStatus.Pending),
-                BuildUser("blocked@example.com", "Blocked", UserStatus.Suspended)
+                BuildUser("blocked@example.com", "Blocked", UserStatus.Suspended),
+                BuildUser("user3@example.com", "User 3", UserStatus.Inactive)
             });
 
         _emailServiceMock
@@ -73,10 +78,12 @@ public class BroadcastSystemNotificationServiceTests
         });
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(2, result.Value.EligibleUserCount);
-        Assert.Equal(2, result.Value.SentCount);
+        Assert.Equal(3, result.Value.EligibleUserCount);
+        Assert.Equal(3, result.Value.SentCount);
         Assert.Equal(0, result.Value.FailedCount);
         Assert.Equal("email", result.Value.Channel);
+        Assert.Equal(3, await _context.UserNotifications.CountAsync());
+        Assert.Equal(3, await _context.UserNotifications.CountAsync(n => !n.IsRead));
 
         _emailServiceMock.Verify(s => s.SendSystemAnnouncementAsync(
             It.IsAny<string>(),
@@ -84,7 +91,16 @@ public class BroadcastSystemNotificationServiceTests
             "Ưu đãi đặc biệt",
             "Nhận ngay ưu đãi 50% trong tuần này",
             "https://example.com/promo",
-            It.IsAny<CancellationToken>()), Times.Exactly(2));
+            It.IsAny<CancellationToken>()), Times.Exactly(3));
+    }
+
+    private static TestDbContext CreateDbContext()
+    {
+        var options = new DbContextOptionsBuilder<TestDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+
+        return new TestDbContext(options);
     }
 
     private static User BuildUser(string email, string username, UserStatus status)
