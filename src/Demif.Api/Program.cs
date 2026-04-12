@@ -1,7 +1,9 @@
 using Demif.Api.Configurations;
 using Demif.Application;
 using Demif.Infrastructure;
+using Demif.Infrastructure.Persistence;
 using Demif.Api.Middlewares;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using System.Threading.RateLimiting;
@@ -71,6 +73,13 @@ builder.Services.AddRateLimiter(opts =>
 });
 
 var app = builder.Build();
+
+// Apply EF Core migrations on startup so deployed environments stay in sync with the current model.
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    await dbContext.Database.MigrateAsync();
+}
 
 // Enable CORS
 app.UseCors("AllowAll");
