@@ -1,4 +1,5 @@
 using Demif.Domain.Enums;
+using Microsoft.AspNetCore.Http;
 
 namespace Demif.Application.Features.Lessons.Admin;
 
@@ -19,6 +20,30 @@ public class UpdateLessonMetadataRequest
     public bool IsPremiumOnly { get; set; }
     public int DisplayOrder { get; set; }
     public string? Tags { get; set; }
+}
+
+/// <summary>
+/// Request upload audio MP3 riêng cho lesson.
+/// Endpoint này chỉ upload file và trả về URL public.
+/// FE sẽ dùng URL này cho quick-create hoặc update metadata.
+/// </summary>
+public class UploadLessonAudioRequest
+{
+    public IFormFile AudioFile { get; set; } = null!;
+    public string FolderName { get; set; } = "demif-lessons/audio";
+}
+
+/// <summary>
+/// Response của endpoint upload audio.
+/// </summary>
+public class UploadLessonAudioResponse
+{
+    public string MediaUrl { get; set; } = string.Empty;
+    public string AudioUrl { get; set; } = string.Empty;
+    public string MediaType { get; set; } = "audio";
+    public string FolderName { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
+    public long FileSize { get; set; }
 }
 
 /// <summary>

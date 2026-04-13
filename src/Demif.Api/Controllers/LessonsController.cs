@@ -38,7 +38,7 @@ public class LessonsController : ControllerBase
 
     /// <summary>
     /// Lấy danh sách lessons với pagination.
-    /// Hỗ trợ filter: level (string "Beginner" hoặc số 0), type, category.
+    /// Hỗ trợ filter: level, type, category, mediaType, tag, search.
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetLessons(

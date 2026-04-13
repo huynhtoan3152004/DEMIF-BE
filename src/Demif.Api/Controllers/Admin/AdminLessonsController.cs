@@ -1,4 +1,6 @@
 using Demif.Application.Features.Lessons.Admin;
+using Demif.Application.Abstractions.Services;
+using Demif.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -32,15 +34,18 @@ public class AdminLessonsController : ControllerBase
     private readonly AdminLessonService _adminService;
     private readonly YouTubeLessonService _youTubeService;
     private readonly AdminTranscriptService _transcriptService;
+    private readonly IAudioUploadService _audioUploadService;
 
     public AdminLessonsController(
         AdminLessonService adminService,
         YouTubeLessonService youTubeService,
-        AdminTranscriptService transcriptService)
+        AdminTranscriptService transcriptService,
+        IAudioUploadService audioUploadService)
     {
         _adminService = adminService;
         _youTubeService = youTubeService;
         _transcriptService = transcriptService;
+        _audioUploadService = audioUploadService;
     }
 
     // ╔══════════════════════════════════════════════════════════════════╗
@@ -60,17 +65,76 @@ public class AdminLessonsController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string? status = null,
+        [FromQuery] Level? level = null,
+        [FromQuery] LessonType? type = null,
+        [FromQuery] string? category = null,
+        [FromQuery] string? mediaType = null,
+        [FromQuery] string? tag = null,
+        [FromQuery] string? search = null,
+        [FromQuery] bool? isPremiumOnly = null,
         CancellationToken cancellationToken = default)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var result = await _adminService.GetAllAsync(page, pageSize, status, cancellationToken);
+        var result = await _adminService.GetAllAsync(
+            page,
+            pageSize,
+            status,
+            level,
+            type,
+            category,
+            mediaType,
+            tag,
+            search,
+            isPremiumOnly,
+            cancellationToken);
 
         if (result.IsFailure)
             return BadRequest(new { error = result.Error.Message });
 
         return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Upload riêng file MP3/audio lên Cloudinary và trả về URL.
+    /// Endpoint này tách biệt hoàn toàn với YouTube import.
+    /// </summary>
+    [HttpPost("audio/upload")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UploadAudio([FromForm] UploadLessonAudioRequest request)
+    {
+        if (request.AudioFile is null || request.AudioFile.Length == 0)
+            return BadRequest(new { error = "AudioFile không được để trống." });
+
+        var isMp3 = request.AudioFile.FileName.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(request.AudioFile.ContentType, "audio/mpeg", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(request.AudioFile.ContentType, "audio/mp3", StringComparison.OrdinalIgnoreCase);
+
+        if (!isMp3)
+            return BadRequest(new { error = "Chỉ hỗ trợ file MP3/audio hợp lệ." });
+
+        try
+        {
+            var uploadedUrl = await _audioUploadService.UploadAudioAsync(request.AudioFile, request.FolderName);
+            if (string.IsNullOrWhiteSpace(uploadedUrl))
+                return BadRequest(new { error = "Upload audio thất bại." });
+
+            return Ok(new UploadLessonAudioResponse
+            {
+                MediaUrl = uploadedUrl,
+                AudioUrl = uploadedUrl,
+                MediaType = "audio",
+                FolderName = request.FolderName,
+                FileName = request.AudioFile.FileName,
+                FileSize = request.AudioFile.Length
+            });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     /// <summary>

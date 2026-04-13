@@ -45,6 +45,9 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
         Level? level = null,
         LessonType? type = null,
         string? category = null,
+        string? mediaType = null,
+        string? tag = null,
+        string? search = null,
         bool? isPremiumOnly = null,
         string? status = null,
         CancellationToken cancellationToken = default)
@@ -59,6 +62,32 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
 
         if (!string.IsNullOrEmpty(category))
             query = query.Where(l => l.Category == category);
+
+        if (!string.IsNullOrWhiteSpace(mediaType))
+        {
+            var normalizedMediaType = mediaType.Trim().ToLower();
+            if (normalizedMediaType == "audio")
+            {
+                query = query.Where(l => l.MediaType == null || l.MediaType.ToLower() == "audio");
+            }
+            else
+            {
+                query = query.Where(l => l.MediaType != null && l.MediaType.ToLower() == normalizedMediaType);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(tag))
+        {
+            var normalizedTag = tag.Trim().ToLower();
+            query = query.Where(l => l.Tags != null && l.Tags.ToLower().Contains(normalizedTag));
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var normalizedSearch = search.Trim().ToLower();
+            query = query.Where(l => l.Title.ToLower().Contains(normalizedSearch)
+                || (l.Description ?? string.Empty).ToLower().Contains(normalizedSearch));
+        }
 
         if (isPremiumOnly.HasValue)
             query = query.Where(l => l.IsPremiumOnly == isPremiumOnly.Value);
@@ -85,6 +114,9 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
         Level? level = null,
         LessonType? type = null,
         string? category = null,
+        string? mediaType = null,
+        string? tag = null,
+        string? search = null,
         CancellationToken cancellationToken = default)
     {
         var query = _dbSet.Where(l => l.Status == "published");
@@ -101,6 +133,32 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
 
         if (!string.IsNullOrEmpty(category))
             query = query.Where(l => l.Category == category);
+
+        if (!string.IsNullOrWhiteSpace(mediaType))
+        {
+            var normalizedMediaType = mediaType.Trim().ToLower();
+            if (normalizedMediaType == "audio")
+            {
+                query = query.Where(l => l.MediaType == null || l.MediaType.ToLower() == "audio");
+            }
+            else
+            {
+                query = query.Where(l => l.MediaType != null && l.MediaType.ToLower() == normalizedMediaType);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(tag))
+        {
+            var normalizedTag = tag.Trim().ToLower();
+            query = query.Where(l => l.Tags != null && l.Tags.ToLower().Contains(normalizedTag));
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var normalizedSearch = search.Trim().ToLower();
+            query = query.Where(l => l.Title.ToLower().Contains(normalizedSearch)
+                || (l.Description ?? string.Empty).ToLower().Contains(normalizedSearch));
+        }
 
         var totalCount = await query.CountAsync(cancellationToken);
 

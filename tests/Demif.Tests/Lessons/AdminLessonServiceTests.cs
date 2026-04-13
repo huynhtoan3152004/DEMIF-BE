@@ -107,6 +107,58 @@ public class AdminLessonServiceTests
 
     #endregion
 
+    #region GetAll Tests
+
+    [Fact]
+    public async Task GetAllAsync_PassesFiltersToRepository()
+    {
+        // Arrange
+        _lessonRepoMock
+            .Setup(r => r.GetPaginatedAsync(
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<Level?>(),
+                It.IsAny<LessonType?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<bool?>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(((IEnumerable<Lesson> Items, int TotalCount))(Array.Empty<Lesson>(), 0));
+
+        // Act
+        var result = await _service.GetAllAsync(
+            page: 2,
+            pageSize: 20,
+            status: "published",
+            level: Level.Beginner,
+            type: LessonType.Dictation,
+            category: "business",
+            mediaType: "audio",
+            tag: "bbc",
+            search: "english",
+            isPremiumOnly: false);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        _lessonRepoMock.Verify(r => r.GetPaginatedAsync(
+            2,
+            20,
+            Level.Beginner,
+            LessonType.Dictation,
+            "business",
+            "audio",
+            "bbc",
+            "english",
+            false,
+            "published",
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    #endregion
+
     #region Update Tests
 
     [Fact]

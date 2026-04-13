@@ -21,6 +21,9 @@ public interface ILessonRepository : IGenericRepository<Lesson>
         Level? level = null,
         LessonType? type = null,
         string? category = null,
+        string? mediaType = null,
+        string? tag = null,
+        string? search = null,
         bool? isPremiumOnly = null,
         string? status = null,
         CancellationToken cancellationToken = default);
@@ -35,6 +38,9 @@ public interface ILessonRepository : IGenericRepository<Lesson>
         Level? level = null,
         LessonType? type = null,
         string? category = null,
+        string? mediaType = null,
+        string? tag = null,
+        string? search = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

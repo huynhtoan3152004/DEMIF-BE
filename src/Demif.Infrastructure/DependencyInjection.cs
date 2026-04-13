@@ -51,6 +51,7 @@ public static class DependencyInjection
         services.AddSingleton<IGoogleAuthService, GoogleAuthService>();
         services.AddScoped<IEmailService, SmtpEmailService>();
         services.AddScoped<IImageUploadService, CloudinaryImageUploadService>();
+        services.AddScoped<IAudioUploadService, CloudinaryAudioUploadService>();
 
         services.AddHostedService<SubscriptionExpiryBackgroundService>();
 

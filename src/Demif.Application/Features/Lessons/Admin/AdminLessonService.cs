@@ -68,11 +68,25 @@ public class AdminLessonService
         int page = 1,
         int pageSize = 10,
         string? status = null,
+        Level? level = null,
+        LessonType? type = null,
+        string? category = null,
+        string? mediaType = null,
+        string? tag = null,
+        string? search = null,
+        bool? isPremiumOnly = null,
         CancellationToken cancellationToken = default)
     {
         var (items, totalCount) = await _lessonRepository.GetPaginatedAsync(
             page,
             pageSize,
+            level: level,
+            type: type,
+            category: category,
+            mediaType: mediaType,
+            tag: tag,
+            search: search,
+            isPremiumOnly: isPremiumOnly,
             status: status,
             cancellationToken: cancellationToken);
 
@@ -544,7 +558,7 @@ public class AdminLessonService
             Category = lesson.Category,
             AudioUrl = lesson.AudioUrl,
             MediaUrl = lesson.MediaUrl,
-            MediaType = lesson.MediaType,
+            MediaType = lesson.MediaType ?? "audio",
             VideoId = isYouTube ? ExtractYouTubeVideoId(lesson.MediaUrl) : null,
             EmbedUrl = isYouTube ? lesson.MediaUrl : null,
             DurationSeconds = lesson.DurationSeconds,

@@ -32,7 +32,7 @@ public class GetLessonsService
         // Login user = full catalog, Guest = free only
         var isLoggedIn = userId.HasValue;
 
-        var cacheKey = $"lessons:{request.Page}:{request.PageSize}:{request.Level}:{request.Type}:{request.Category}:{isLoggedIn}";
+        var cacheKey = $"lessons:{request.Page}:{request.PageSize}:{request.Level}:{request.Type}:{request.Category}:{request.MediaType}:{request.Tag}:{request.Search}:{isLoggedIn}";
 
         var response = await _cacheService.GetOrCreateAsync(cacheKey, async (ct) =>
         {
@@ -43,6 +43,9 @@ public class GetLessonsService
                 request.Level,
                 request.Type,
                 request.Category,
+            request.MediaType,
+            request.Tag,
+            request.Search,
                 ct);
 
             return new GetLessonsResponse

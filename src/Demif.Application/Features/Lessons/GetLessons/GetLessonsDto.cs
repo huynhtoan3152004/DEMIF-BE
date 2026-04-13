@@ -12,6 +12,9 @@ public class GetLessonsRequest
     public Level? Level { get; set; }
     public LessonType? Type { get; set; }
     public string? Category { get; set; }
+    public string? MediaType { get; set; }
+    public string? Tag { get; set; }
+    public string? Search { get; set; }
 }
 
 /// <summary>

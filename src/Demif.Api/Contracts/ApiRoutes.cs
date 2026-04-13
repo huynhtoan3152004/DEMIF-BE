@@ -49,6 +49,7 @@ public static class ApiRoutes
     {
         public const string GetAll = $"{Base}/admin/lessons";
         public const string GetById = $"{Base}/admin/lessons/{{id}}";
+        public const string UploadAudio = $"{Base}/admin/lessons/audio/upload";
         public const string Create = $"{Base}/admin/lessons";
         public const string QuickCreate = $"{Base}/admin/lessons/quick-create";
         public const string CreateFromYouTube = $"{Base}/admin/lessons/from-youtube";
