@@ -30,6 +30,7 @@ public class UpdateLessonMetadataRequest
 public class UploadLessonAudioRequest
 {
     public IFormFile AudioFile { get; set; } = null!;
+    public IFormFile? File { get; set; }
     public string FolderName { get; set; } = "demif-lessons/audio";
 }
 

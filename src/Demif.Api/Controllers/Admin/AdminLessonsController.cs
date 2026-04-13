@@ -101,23 +101,28 @@ public class AdminLessonsController : ControllerBase
     /// Endpoint này tách biệt hoàn toàn với YouTube import.
     /// </summary>
     [HttpPost("audio/upload")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(50_000_000)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 50_000_000)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UploadAudio([FromForm] UploadLessonAudioRequest request)
     {
-        if (request.AudioFile is null || request.AudioFile.Length == 0)
+        var audioFile = request.AudioFile ?? request.File;
+
+        if (audioFile is null || audioFile.Length == 0)
             return BadRequest(new { error = "AudioFile không được để trống." });
 
-        var isMp3 = request.AudioFile.FileName.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(request.AudioFile.ContentType, "audio/mpeg", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(request.AudioFile.ContentType, "audio/mp3", StringComparison.OrdinalIgnoreCase);
+        var isMp3 = audioFile.FileName.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(audioFile.ContentType, "audio/mpeg", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(audioFile.ContentType, "audio/mp3", StringComparison.OrdinalIgnoreCase);
 
         if (!isMp3)
             return BadRequest(new { error = "Chỉ hỗ trợ file MP3/audio hợp lệ." });
 
         try
         {
-            var uploadedUrl = await _audioUploadService.UploadAudioAsync(request.AudioFile, request.FolderName);
+            var uploadedUrl = await _audioUploadService.UploadAudioAsync(audioFile, request.FolderName);
             if (string.IsNullOrWhiteSpace(uploadedUrl))
                 return BadRequest(new { error = "Upload audio thất bại." });
 
@@ -127,8 +132,8 @@ public class AdminLessonsController : ControllerBase
                 AudioUrl = uploadedUrl,
                 MediaType = "audio",
                 FolderName = request.FolderName,
-                FileName = request.AudioFile.FileName,
-                FileSize = request.AudioFile.Length
+                FileName = audioFile.FileName,
+                FileSize = audioFile.Length
             });
         }
         catch (Exception ex)
