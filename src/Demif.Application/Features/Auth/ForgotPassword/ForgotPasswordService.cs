@@ -49,7 +49,9 @@ public class ForgotPasswordService
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         // Gửi email
-        var frontendUrl = _configuration["App:FrontendUrl"]?.TrimEnd('/') ?? "http://localhost:3000";
+        var frontendUrl = _configuration["App:FrontendUrl"]?.TrimEnd('/')
+            ?? _configuration["App:LegacyFrontendUrl"]?.TrimEnd('/')
+            ?? "http://localhost:3000";
         var resetToken = Uri.EscapeDataString(token);
         var resetUrl = $"{frontendUrl}/reset-password?token={resetToken}";
 

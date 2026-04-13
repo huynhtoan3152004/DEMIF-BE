@@ -94,7 +94,9 @@ public class RegisterService
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         // 8. Gửi email xác nhận
-        var frontendUrl = _configuration["App:FrontendUrl"]?.TrimEnd('/') ?? "http://localhost:3000";
+        var frontendUrl = _configuration["App:FrontendUrl"]?.TrimEnd('/')
+            ?? _configuration["App:LegacyFrontendUrl"]?.TrimEnd('/')
+            ?? "http://localhost:3000";
         var token = Uri.EscapeDataString(user.EmailVerificationToken!);
         var verifyUrl = $"{frontendUrl}/verify-email?token={token}";
 
