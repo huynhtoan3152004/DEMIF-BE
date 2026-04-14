@@ -39,7 +39,7 @@ public class DictationController : ControllerBase
     [HttpGet("{id:guid}/dictation")]
     public async Task<IActionResult> GetDictationExercise(
         Guid id,
-        [FromQuery] string levelStr = "Beginner",
+        [FromQuery(Name = "level")] string levelStr = "Beginner",
         CancellationToken cancellationToken = default)
     {
         Level level;

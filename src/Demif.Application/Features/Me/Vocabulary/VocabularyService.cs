@@ -84,6 +84,7 @@ public class VocabularyService
                 Note = NormalizeOptional(request.Note),
                 ReviewCount = 0,
                 CorrectReviews = 0,
+                ConsecutiveCorrect = 0,
                 IsMastered = false,
                 NextReviewAt = now.AddDays(1)
             };
@@ -299,13 +300,26 @@ public class VocabularyService
             return Result.Failure<VocabularyItemResponse>(Error.NotFound("Không tìm thấy từ vựng."));
 
         var now = DateTime.UtcNow;
+        var isEarlyReview = item.NextReviewAt > now;
 
         item.ReviewCount++;
-        if (request.IsCorrect)
-            item.CorrectReviews++;
-
         item.LastReviewedAt = now;
-        item.NextReviewAt = now.AddDays(GetNextReviewIntervalDays(item.ReviewCount, request.IsCorrect));
+
+        if (request.IsCorrect)
+        {
+            item.CorrectReviews++;
+            if (!isEarlyReview)
+            {
+                item.ConsecutiveCorrect++;
+                item.NextReviewAt = now.AddDays(GetNextReviewIntervalDays(item.ConsecutiveCorrect));
+            }
+        }
+        else
+        {
+            item.ConsecutiveCorrect = 0;
+            item.NextReviewAt = now.AddDays(GetNextReviewIntervalDays(item.ConsecutiveCorrect));
+        }
+
         item.IsMastered = request.IsCorrect && item.CorrectReviews >= 3;
         item.MasteredAt = item.IsMastered && item.MasteredAt is null ? now : item.MasteredAt;
         item.UpdatedAt = now;
@@ -329,12 +343,9 @@ public class VocabularyService
         return Result.Success();
     }
 
-    private static int GetNextReviewIntervalDays(int reviewCount, bool isCorrect)
+    private static int GetNextReviewIntervalDays(int consecutiveCorrect)
     {
-        if (!isCorrect)
-            return 1;
-
-        var index = Math.Clamp(reviewCount - 1, 0, ReviewIntervalsInDays.Length - 1);
+        var index = Math.Clamp(consecutiveCorrect, 0, ReviewIntervalsInDays.Length - 1);
         return ReviewIntervalsInDays[index];
     }
 

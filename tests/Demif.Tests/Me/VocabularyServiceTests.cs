@@ -228,4 +228,71 @@ public class VocabularyServiceTests
         Assert.Single(result.Value.Items);
         Assert.Contains(result.Value.Items, item => item.NormalizedWord == "journey" && item.IsAlreadySaved);
     }
+
+    [Fact]
+    public async Task ReviewAsync_WhenIncorrect_ResetsStreakAndInterval()
+    {
+        var context = CreateDbContext();
+        var lesson = CreatePublishedLesson(Guid.NewGuid(), "academic");
+        context.Lessons.Add(lesson);
+
+        var vocabulary = new UserVocabulary
+        {
+            UserId = _userId,
+            LessonId = lesson.Id,
+            Topic = "academic",
+            Word = "analysis",
+            NormalizedWord = "analysis",
+            NextReviewAt = DateTime.UtcNow.AddDays(-1),
+            ConsecutiveCorrect = 3
+        };
+
+        context.UserVocabularies.Add(vocabulary);
+        await context.SaveChangesAsync();
+
+        var service = new VocabularyService(context);
+
+        var result = await service.ReviewAsync(_userId, vocabulary.Id, new ReviewVocabularyRequest { IsCorrect = false });
+
+        Assert.True(result.IsSuccess);
+        
+        var expectedNextReview = DateTime.UtcNow.AddDays(1);
+        Assert.True(result.Value.NextReviewAt.HasValue);
+        var diff = expectedNextReview - result.Value.NextReviewAt.Value;
+        Assert.True(Math.Abs(diff.TotalMinutes) < 1);
+    }
+
+    [Fact]
+    public async Task ReviewAsync_WhenEarlyReview_DoesNotAdvanceSchedule()
+    {
+        var context = CreateDbContext();
+        var lesson = CreatePublishedLesson(Guid.NewGuid(), "academic");
+        context.Lessons.Add(lesson);
+
+        var originalNextReview = DateTime.UtcNow.AddDays(5);
+        var vocabulary = new UserVocabulary
+        {
+            UserId = _userId,
+            LessonId = lesson.Id,
+            Topic = "academic",
+            Word = "analysis",
+            NormalizedWord = "analysis",
+            NextReviewAt = originalNextReview,
+            ConsecutiveCorrect = 2
+        };
+
+        context.UserVocabularies.Add(vocabulary);
+        await context.SaveChangesAsync();
+
+        var service = new VocabularyService(context);
+
+        // Act: early review
+        var result = await service.ReviewAsync(_userId, vocabulary.Id, new ReviewVocabularyRequest { IsCorrect = true });
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.NextReviewAt.HasValue);
+        var diff = originalNextReview - result.Value.NextReviewAt.Value;
+        // The difference should be 0 since it wasn't updated.
+        Assert.True(Math.Abs(diff.TotalMinutes) < 1);
+    }
 }
