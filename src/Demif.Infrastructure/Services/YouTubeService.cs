@@ -44,12 +44,41 @@ public partial class YouTubeService : IYouTubeService
             return null;
         }
 
+        var info = await TryGetVideoInfoFromDataApiAsync(videoId, cancellationToken)
+            ?? await TryGetVideoInfoFromPublicPageAsync(videoId, cancellationToken);
+
+        if (info is null)
+        {
+            _logger.LogWarning("Không thể lấy thông tin video từ cả YouTube Data API và public page: {VideoId}", videoId);
+            return null;
+        }
+
+        var captionLanguages = await GetAvailableCaptionLanguagesAsync(videoId, cancellationToken);
+        info.HasCaptions = captionLanguages.Count > 0;
+        info.AvailableCaptionLanguages = captionLanguages;
+
+        _logger.LogInformation(
+            "Fetched YouTube video info: '{Title}' ({Duration}s, captions: {CaptionCount} languages)",
+            info.Title, info.DurationSeconds, info.AvailableCaptionLanguages.Count);
+
+        return info;
+    }
+
+    private async Task<YouTubeVideoInfo?> TryGetVideoInfoFromDataApiAsync(string videoId, CancellationToken cancellationToken)
+    {
         try
         {
             // Fetch video snippet + contentDetails (cost: 1+2 = 3 units)
             var url = $"{YoutubeApiBase}/videos?part=snippet,contentDetails&id={videoId}&key={_apiKey}";
             var response = await _httpClient.GetAsync(url, cancellationToken);
-            response.EnsureSuccessStatusCode();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "YouTube videos API returned {StatusCode} for {VideoId}",
+                    response.StatusCode, videoId);
+                return null;
+            }
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
             var data = JsonSerializer.Deserialize<YouTubeVideoListResponse>(json, JsonOptions);
@@ -78,15 +107,67 @@ public partial class YouTubeService : IYouTubeService
                 AvailableCaptionLanguages = captionLanguages
             };
 
-            _logger.LogInformation(
-                "Fetched YouTube video info: '{Title}' ({Duration}s, captions: {CaptionCount} languages)",
-                info.Title, info.DurationSeconds, info.AvailableCaptionLanguages.Count);
-
             return info;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Lỗi khi fetch YouTube video info cho: {VideoId}", videoId);
+            _logger.LogWarning(ex, "Lỗi khi fetch YouTube video info qua Data API cho: {VideoId}", videoId);
+            return null;
+        }
+    }
+
+    private async Task<YouTubeVideoInfo?> TryGetVideoInfoFromPublicPageAsync(string videoId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var url = $"https://www.youtube.com/watch?v={videoId}&hl=en";
+            var response = await _httpClient.GetAsync(url, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "YouTube public page returned {StatusCode} for {VideoId}",
+                    response.StatusCode, videoId);
+                return null;
+            }
+
+            var html = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(html))
+            {
+                _logger.LogWarning("YouTube public page response rỗng cho video {VideoId}", videoId);
+                return null;
+            }
+
+            var title = ExtractMetaContent(html, "og:title")
+                ?? ExtractMetaContent(html, "title")
+                ?? string.Empty;
+
+            var description = ExtractMetaContent(html, "og:description")
+                ?? ExtractMetaContent(html, "description");
+
+            var thumbnail = ExtractMetaContent(html, "og:image");
+            var durationSeconds = ExtractDurationFromHtml(html);
+
+            if (string.IsNullOrWhiteSpace(title) || durationSeconds <= 0)
+            {
+                _logger.LogWarning(
+                    "Không thể trích xuất đủ metadata từ public page cho video {VideoId}. Title='{Title}', Duration={Duration}",
+                    videoId, title, durationSeconds);
+                return null;
+            }
+
+            return new YouTubeVideoInfo
+            {
+                VideoId = videoId,
+                Title = WebUtility.HtmlDecode(title).Trim(),
+                Description = string.IsNullOrWhiteSpace(description) ? null : WebUtility.HtmlDecode(description).Trim(),
+                ThumbnailUrl = thumbnail,
+                DurationSeconds = durationSeconds
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Lỗi khi fallback fetch YouTube video info cho: {VideoId}", videoId);
             return null;
         }
     }
@@ -329,6 +410,29 @@ public partial class YouTubeService : IYouTubeService
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
+
+    private static string? ExtractMetaContent(string html, string metaName)
+    {
+        var pattern = $"<meta\\s+(?:property|name)=[\"']{Regex.Escape(metaName)}[\"']\\s+content=[\"'](?<value>[^\"']*)[\"']";
+        var match = Regex.Match(html, pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        if (!match.Success)
+            return null;
+
+        return WebUtility.HtmlDecode(match.Groups["value"].Value);
+    }
+
+    private static int ExtractDurationFromHtml(string html)
+    {
+        var lengthMatch = Regex.Match(html, "\"lengthSeconds\"\\s*:\\s*\"(?<seconds>\\d+)\"", RegexOptions.Compiled);
+        if (lengthMatch.Success && int.TryParse(lengthMatch.Groups["seconds"].Value, out var lengthSeconds))
+            return lengthSeconds;
+
+        var approxMatch = Regex.Match(html, "\"approxDurationMs\"\\s*:\\s*\"(?<milliseconds>\\d+)\"", RegexOptions.Compiled);
+        if (approxMatch.Success && long.TryParse(approxMatch.Groups["milliseconds"].Value, out var approxMilliseconds))
+            return (int)Math.Round(approxMilliseconds / 1000.0);
+
+        return 0;
+    }
 
     #endregion
 }
