@@ -4,6 +4,7 @@ using Demif.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace Demif.Api.Controllers.Admin;
 
@@ -35,17 +36,20 @@ public class AdminLessonsController : ControllerBase
     private readonly YouTubeLessonService _youTubeService;
     private readonly AdminTranscriptService _transcriptService;
     private readonly IAudioUploadService _audioUploadService;
+    private readonly ILogger<AdminLessonsController> _logger;
 
     public AdminLessonsController(
         AdminLessonService adminService,
         YouTubeLessonService youTubeService,
         AdminTranscriptService transcriptService,
-        IAudioUploadService audioUploadService)
+        IAudioUploadService audioUploadService,
+        ILogger<AdminLessonsController> logger)
     {
         _adminService = adminService;
         _youTubeService = youTubeService;
         _transcriptService = transcriptService;
         _audioUploadService = audioUploadService;
+        _logger = logger;
     }
 
     // ╔══════════════════════════════════════════════════════════════════╗
@@ -99,46 +103,91 @@ public class AdminLessonsController : ControllerBase
     /// <summary>
     /// Upload riêng file MP3/audio lên Cloudinary và trả về URL.
     /// Endpoint này tách biệt hoàn toàn với YouTube import.
+    /// Accept MỌI field name từ FormData (AudioFile, File, audio, file, mp3File...).
     /// </summary>
     [HttpPost("audio/upload")]
-    [Consumes("multipart/form-data")]
     [RequestSizeLimit(50_000_000)]
     [RequestFormLimits(MultipartBodyLengthLimit = 50_000_000)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> UploadAudio([FromForm] UploadLessonAudioRequest request)
+    public async Task<IActionResult> UploadAudio()
     {
-        var audioFile = request.AudioFile ?? request.File;
+        _logger.LogInformation(
+            "[AudioUpload] Request received. ContentType: {ContentType}, ContentLength: {Length}, HasFormContentType: {HasForm}",
+            Request.ContentType, Request.ContentLength, Request.HasFormContentType);
+
+        if (!Request.HasFormContentType)
+        {
+            _logger.LogWarning("[AudioUpload] Request is NOT multipart/form-data. ContentType: {ContentType}", Request.ContentType);
+            return BadRequest(new { error = "Request phải là multipart/form-data." });
+        }
+
+        var form = await Request.ReadFormAsync();
+
+        _logger.LogInformation(
+            "[AudioUpload] Form files count: {Count}, Field names: [{Fields}]",
+            form.Files.Count,
+            string.Join(", ", form.Files.Select(f => $"{f.Name}={f.FileName}({f.Length}b)")));
+
+        // Accept file từ BẤT KỲ field name nào
+        var audioFile = form.Files.GetFile("AudioFile")
+                     ?? form.Files.GetFile("audioFile")
+                     ?? form.Files.GetFile("File")
+                     ?? form.Files.GetFile("file")
+                     ?? form.Files.GetFile("audio")
+                     ?? form.Files.GetFile("mp3File")
+                     ?? (form.Files.Count > 0 ? form.Files[0] : null);
 
         if (audioFile is null || audioFile.Length == 0)
-            return BadRequest(new { error = "AudioFile không được để trống." });
+        {
+            _logger.LogWarning("[AudioUpload] No audio file found in form. Files count: {Count}", form.Files.Count);
+            return BadRequest(new { error = "AudioFile không được để trống. Gửi file trong FormData với field name bất kỳ." });
+        }
 
-        var isMp3 = audioFile.FileName.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(audioFile.ContentType, "audio/mpeg", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(audioFile.ContentType, "audio/mp3", StringComparison.OrdinalIgnoreCase);
+        _logger.LogInformation(
+            "[AudioUpload] File found: Name={Name}, FileName={FileName}, ContentType={ContentType}, Size={Size}b",
+            audioFile.Name, audioFile.FileName, audioFile.ContentType, audioFile.Length);
 
-        if (!isMp3)
-            return BadRequest(new { error = "Chỉ hỗ trợ file MP3/audio hợp lệ." });
+        // Accept wider audio MIME types
+        var allowedExtensions = new[] { ".mp3", ".wav", ".ogg", ".m4a", ".aac", ".wma", ".flac" };
+        var allowedMimeTypes = new[] { "audio/mpeg", "audio/mp3", "audio/wav", "audio/ogg", "audio/x-m4a", "audio/aac", "audio/x-wav", "audio/webm" };
+
+        var hasValidExtension = allowedExtensions.Any(ext => audioFile.FileName.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
+        var hasValidMime = allowedMimeTypes.Any(mime => string.Equals(audioFile.ContentType, mime, StringComparison.OrdinalIgnoreCase));
+
+        if (!hasValidExtension && !hasValidMime)
+        {
+            _logger.LogWarning("[AudioUpload] Invalid file type: {FileName}, ContentType={ContentType}", audioFile.FileName, audioFile.ContentType);
+            return BadRequest(new { error = $"File type không hợp lệ. Hỗ trợ: {string.Join(", ", allowedExtensions)}. ContentType nhận được: {audioFile.ContentType}" });
+        }
+
+        var folderName = form.TryGetValue("FolderName", out var folderVal) ? folderVal.ToString() : "demif-lessons/audio";
 
         try
         {
-            var uploadedUrl = await _audioUploadService.UploadAudioAsync(audioFile, request.FolderName);
+            var uploadedUrl = await _audioUploadService.UploadAudioAsync(audioFile, folderName);
             if (string.IsNullOrWhiteSpace(uploadedUrl))
-                return BadRequest(new { error = "Upload audio thất bại." });
+            {
+                _logger.LogError("[AudioUpload] Cloudinary returned null/empty URL");
+                return BadRequest(new { error = "Upload audio thất bại — Cloudinary không trả URL." });
+            }
+
+            _logger.LogInformation("[AudioUpload] Success! URL: {Url}", uploadedUrl);
 
             return Ok(new UploadLessonAudioResponse
             {
                 MediaUrl = uploadedUrl,
                 AudioUrl = uploadedUrl,
                 MediaType = "audio",
-                FolderName = request.FolderName,
+                FolderName = folderName,
                 FileName = audioFile.FileName,
                 FileSize = audioFile.Length
             });
         }
         catch (Exception ex)
         {
-            return BadRequest(new { error = ex.Message });
+            _logger.LogError(ex, "[AudioUpload] Exception during upload: {Message}", ex.Message);
+            return StatusCode(500, new { error = $"Lỗi upload: {ex.Message}" });
         }
     }
 

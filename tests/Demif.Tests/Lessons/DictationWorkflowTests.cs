@@ -5,6 +5,7 @@ using Demif.Application.Features.Lessons.Admin;
 using Demif.Application.Abstractions.Services;
 using Demif.Application.Features.Lessons.CheckSegment;
 using Demif.Application.Features.Lessons.GetLessonSegments;
+using Demif.Application.Features.Lessons.Tracking;
 using Demif.Domain.Entities;
 using Demif.Domain.Enums;
 using Microsoft.Extensions.Logging;
@@ -248,10 +249,13 @@ public class CheckSegmentServiceTests
         dbMock.Setup(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()))
               .ReturnsAsync(1);
 
+        var xpServiceMock = new Mock<XpService>(dbMock.Object, Mock.Of<ILogger<XpService>>());
+
         return new CheckSegmentService(
             lessonRepoMock.Object,
             dbMock.Object,
-            Mock.Of<ILogger<CheckSegmentService>>());
+            Mock.Of<ILogger<CheckSegmentService>>(),
+            xpServiceMock.Object);
     }
 
     private static Mock<Microsoft.EntityFrameworkCore.DbSet<T>> MockDbSet<T>(List<T> data)
@@ -391,9 +395,12 @@ public class CheckSegmentServiceTests
                       .ReturnsAsync(lesson);
         var dbMock = new Mock<IApplicationDbContext>();
 
+        var xpServiceMock = new Mock<XpService>(dbMock.Object, Mock.Of<ILogger<XpService>>());
+
         var service = new CheckSegmentService(
             lessonRepoMock.Object, dbMock.Object,
-            Mock.Of<ILogger<CheckSegmentService>>());
+            Mock.Of<ILogger<CheckSegmentService>>(),
+            xpServiceMock.Object);
 
         var result = await service.ExecuteAsync(
             lesson.Id, 0,

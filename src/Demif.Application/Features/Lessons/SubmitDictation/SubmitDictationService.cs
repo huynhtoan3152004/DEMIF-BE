@@ -2,6 +2,7 @@ using System.Text.Json;
 using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Common.Models;
+using Demif.Application.Features.Lessons.Tracking;
 using Demif.Domain.Entities;
 using Demif.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -18,15 +19,18 @@ public class SubmitDictationService
     private readonly ILessonRepository _lessonRepository;
     private readonly IApplicationDbContext _dbContext;
     private readonly ILogger<SubmitDictationService> _logger;
+    private readonly XpService _xpService;
 
     public SubmitDictationService(
         ILessonRepository lessonRepository,
         IApplicationDbContext dbContext,
-        ILogger<SubmitDictationService> logger)
+        ILogger<SubmitDictationService> logger,
+        XpService xpService)
     {
         _lessonRepository = lessonRepository;
         _dbContext = dbContext;
         _logger = logger;
+        _xpService = xpService;
     }
 
     public async Task<Result<DictationSubmitResponse>> ExecuteAsync(
@@ -187,6 +191,10 @@ public class SubmitDictationService
 
         // Update denormalized stats on Lesson
         await UpdateLessonStatsAsync(lesson, lessonId, cancellationToken);
+
+        // Award XP based on score
+        try { await _xpService.AwardDictationSubmitXpAsync(userId, lessonId, newScore, cancellationToken); }
+        catch (Exception ex) { _logger.LogWarning(ex, "Failed to award XP for dictation submit on lesson {LessonId}", lessonId); }
 
         _logger.LogInformation(
             "User {UserId} submitted dictation for lesson {LessonId} (Level: {Level}): {Score}% ({Correct}/{Answered}/{Total}), perfect: {IsFullyCorrect}",

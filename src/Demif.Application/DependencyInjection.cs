@@ -107,6 +107,9 @@ public static class DependencyInjection
         services.AddScoped<CheckShadowingService>();
         services.AddScoped<AdminTranscriptService>();
         services.AddScoped<Demif.Application.Features.Lessons.Tracking.SyncProgressService>();
+        services.AddScoped<Demif.Application.Features.Lessons.Tracking.GetCompletedSegmentsService>();
+        services.AddScoped<Demif.Application.Features.Lessons.Tracking.GetLessonHistoryService>();
+        services.AddScoped<Demif.Application.Features.Lessons.Tracking.XpService>();
 
         // Payment Services
         services.AddScoped<SePayWebhookService>();

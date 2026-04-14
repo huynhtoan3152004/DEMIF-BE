@@ -2,6 +2,7 @@ using System.Text.Json;
 using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Common.Models;
+using Demif.Application.Features.Lessons.Tracking;
 using Demif.Domain.Entities;
 using Demif.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +25,7 @@ public class CheckSegmentService
     private readonly ILessonRepository _lessonRepository;
     private readonly IApplicationDbContext _dbContext;
     private readonly ILogger<CheckSegmentService> _logger;
+    private readonly XpService _xpService;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -35,11 +37,13 @@ public class CheckSegmentService
     public CheckSegmentService(
         ILessonRepository lessonRepository,
         IApplicationDbContext dbContext,
-        ILogger<CheckSegmentService> logger)
+        ILogger<CheckSegmentService> logger,
+        XpService xpService)
     {
         _lessonRepository = lessonRepository;
         _dbContext = dbContext;
         _logger = logger;
+        _xpService = xpService;
     }
 
     public async Task<Result<CheckSegmentResponse>> ExecuteAsync(
@@ -90,6 +94,10 @@ public class CheckSegmentService
 
         // Lưu UserExercise (type = Dictation, dùng chung với flow cũ)
         await SaveExerciseAsync(lessonId, segmentIndex, userId, request, wordResults, accuracy, cancellationToken);
+
+        // Award XP (1 XP per new segment, idempotent)
+        try { await _xpService.AwardSegmentXpAsync(userId, lessonId, segmentIndex, cancellationToken); }
+        catch (Exception ex) { _logger.LogWarning(ex, "Failed to award XP for segment {Index}", segmentIndex); }
 
         _logger.LogInformation(
             "User {UserId} checked segment {Index} of lesson {LessonId} (Level: {Level}): {Accuracy}% ({Correct}/{Total})",

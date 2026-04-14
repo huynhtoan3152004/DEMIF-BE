@@ -19,8 +19,12 @@ public class GetLeaderboardService
 
     public async Task<Result<List<LeaderboardItemResponse>>> ExecuteAsync(int limit = 10, CancellationToken cancellationToken = default)
     {
+        // Only include regular users (User/Premium), exclude Admin/Moderator
+        var excludedRoles = new[] { "Admin", "Moderator" };
+
         var users = await _dbContext.Users
             .Where(u => u.Status == Demif.Domain.Enums.UserStatus.Active)
+            .Where(u => !u.UserRoles.Any(ur => excludedRoles.Contains(ur.Role!.Name)))
             .Include(u => u.Streak)
             .Include(u => u.Progress)
             .OrderByDescending(u => u.Streak != null ? u.Streak.CurrentStreak : 0)

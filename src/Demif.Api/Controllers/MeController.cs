@@ -5,6 +5,7 @@ using Demif.Application.Features.Me.Notifications;
 using Demif.Application.Features.Me.RecordActivity;
 using Demif.Application.Features.Me.GetUserAnalytics;
 using Demif.Application.Features.Me.Stats;
+using Demif.Application.Features.Lessons.Tracking;
 using Demif.Application.Features.Payments.GetHistory;
 using Demif.Application.Features.Subscriptions.GetMySubscription;
 using Demif.Api.Contracts;
@@ -40,6 +41,7 @@ public class MeController : ControllerBase
     private readonly GetUnreadNotificationCountService _getUnreadNotificationCountService;
     private readonly MarkNotificationAsReadService _markNotificationAsReadService;
     private readonly MarkAllNotificationsAsReadService _markAllNotificationsAsReadService;
+    private readonly GetLessonHistoryService _getLessonHistoryService;
 
     public MeController(
         GetProgressService getProgressService,
@@ -56,7 +58,8 @@ public class MeController : ControllerBase
         GetMyNotificationsService getMyNotificationsService,
         GetUnreadNotificationCountService getUnreadNotificationCountService,
         MarkNotificationAsReadService markNotificationAsReadService,
-        MarkAllNotificationsAsReadService markAllNotificationsAsReadService)
+        MarkAllNotificationsAsReadService markAllNotificationsAsReadService,
+        GetLessonHistoryService getLessonHistoryService)
     {
         _getProgressService = getProgressService;
         _getStreakService = getStreakService;
@@ -73,6 +76,7 @@ public class MeController : ControllerBase
         _getUnreadNotificationCountService = getUnreadNotificationCountService;
         _markNotificationAsReadService = markNotificationAsReadService;
         _markAllNotificationsAsReadService = markAllNotificationsAsReadService;
+        _getLessonHistoryService = getLessonHistoryService;
     }
 
     /// <summary>
@@ -379,7 +383,7 @@ public class MeController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy bảng xếp hạng top 10 người dùng có Streak cao nhất.
+    /// Lấy bảng xếp hạng top 10 người dùng có Streak cao nhất (chỉ User/Premium, không bao gồm Admin).
     /// </summary>
     [HttpGet("stats/leaderboard")]
     [ProducesResponseType(typeof(List<LeaderboardItemResponse>), StatusCodes.Status200OK)]
@@ -388,6 +392,32 @@ public class MeController : ControllerBase
         CancellationToken ct = default)
     {
         var result = await _getLeaderboardService.ExecuteAsync(limit, ct);
+        if (result.IsFailure)
+            return BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Lấy lịch sử tất cả bài học user đã tương tác (có phân trang).
+    /// Trả về tiến độ, số segment đã làm, điểm trung bình, status cho từng bài.
+    /// GET /api/me/lesson-history?page=1&amp;pageSize=20&amp;status=InProgress
+    /// </summary>
+    [HttpGet("lesson-history")]
+    [ProducesResponseType(typeof(LessonHistoryResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetLessonHistory(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? status = null,
+        CancellationToken ct = default)
+    {
+        if (_currentUserService.UserId is not { } userId)
+            return Unauthorized();
+
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 50);
+
+        var result = await _getLessonHistoryService.ExecuteAsync(userId, page, pageSize, status, ct);
         if (result.IsFailure)
             return BadRequest(new { error = result.Error.Code, message = result.Error.Message });
 

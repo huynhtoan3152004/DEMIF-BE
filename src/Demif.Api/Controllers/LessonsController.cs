@@ -4,6 +4,7 @@ using Demif.Application.Features.Lessons.GetLessons;
 using Demif.Application.Features.Lessons.GetLessonSegments;
 using Demif.Application.Features.Lessons.Tracking;
 using Demif.Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Demif.Api.Controllers;
@@ -20,6 +21,7 @@ public class LessonsController : ControllerBase
     private readonly GetLessonByIdService _getLessonByIdService;
     private readonly GetLessonSegmentsService _getSegmentsService;
     private readonly SyncProgressService _syncProgressService;
+    private readonly GetCompletedSegmentsService _completedSegmentsService;
     private readonly ICurrentUserService _currentUserService;
 
     public LessonsController(
@@ -27,12 +29,14 @@ public class LessonsController : ControllerBase
         GetLessonByIdService getLessonByIdService,
         GetLessonSegmentsService getSegmentsService,
         SyncProgressService syncProgressService,
+        GetCompletedSegmentsService completedSegmentsService,
         ICurrentUserService currentUserService)
     {
         _getLessonsService = getLessonsService;
         _getLessonByIdService = getLessonByIdService;
         _getSegmentsService = getSegmentsService;
         _syncProgressService = syncProgressService;
+        _completedSegmentsService = completedSegmentsService;
         _currentUserService = currentUserService;
     }
 
@@ -134,9 +138,38 @@ public class LessonsController : ControllerBase
         return Ok(result.Value);
     }
 
+    /// <summary>
+    /// Lấy tiến độ user trong 1 bài học (danh sách segments đã hoàn thành + overall status).
+    /// GET /api/lessons/{id}/my-progress
+    /// </summary>
+    [HttpGet("{id:guid}/my-progress")]
+    [Authorize]
+    [ProducesResponseType(typeof(LessonProgressResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetMyProgress(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetUserIdOrNull();
+        if (userId is null) return Unauthorized();
+
+        var result = await _completedSegmentsService.ExecuteAsync(userId.Value, id, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Code switch
+            {
+                "NotFound" => NotFound(new { error = result.Error.Message }),
+                _ => BadRequest(new { error = result.Error.Message })
+            };
+        }
+
+        return Ok(result.Value);
+    }
+
     private Guid? GetUserIdOrNull()
     {
         return _currentUserService.UserId;
     }
 }
-

@@ -2,6 +2,7 @@ using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Features.Lessons;
 using Demif.Application.Features.Lessons.SubmitDictation;
+using Demif.Application.Features.Lessons.Tracking;
 using Demif.Domain.Entities;
 using Demif.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -39,7 +40,8 @@ public class SubmitDictationServiceTests
         _dbContextMock.Setup(d => d.UserExercises).Returns(mockSet.Object);
         _dbContextMock.Setup(d => d.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-        _service = new SubmitDictationService(_lessonRepoMock.Object, _dbContextMock.Object, _loggerMock.Object);
+        _service = new SubmitDictationService(_lessonRepoMock.Object, _dbContextMock.Object, _loggerMock.Object,
+            new Mock<XpService>(_dbContextMock.Object, Mock.Of<ILogger<XpService>>()).Object);
     }
 
     private static Lesson CreateLessonWithTemplates()

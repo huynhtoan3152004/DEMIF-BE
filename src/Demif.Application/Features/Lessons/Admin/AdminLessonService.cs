@@ -141,7 +141,8 @@ public class AdminLessonService
         lesson.MediaUrl = request.MediaUrl;
         lesson.MediaType = request.MediaType;
         lesson.ThumbnailUrl = request.ThumbnailUrl;
-        lesson.IsPremiumOnly = request.IsPremiumOnly;
+        // Audio lessons are always premium
+        lesson.IsPremiumOnly = string.Equals(request.MediaType, "audio", StringComparison.OrdinalIgnoreCase) || request.IsPremiumOnly;
         lesson.DisplayOrder = request.DisplayOrder;
         lesson.Tags = request.Tags;
         lesson.UpdatedAt = DateTime.UtcNow;
@@ -499,7 +500,8 @@ public class AdminLessonService
             ThumbnailUrl = request.ThumbnailUrl,
             FullTranscript = fullTranscript,
             TimedTranscript = timedTranscriptJson,
-            IsPremiumOnly = request.IsPremiumOnly,
+            // Audio lessons are always premium
+            IsPremiumOnly = string.Equals(mediaType, "audio", StringComparison.OrdinalIgnoreCase) || request.IsPremiumOnly,
             DisplayOrder = request.DisplayOrder,
             Tags = request.Tags,
             Status = "draft"
