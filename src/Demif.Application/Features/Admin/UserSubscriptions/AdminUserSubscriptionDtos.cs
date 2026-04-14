@@ -66,7 +66,9 @@ public record ExtendSubscriptionRequest(
 
 public record CancelSubscriptionRequest(
     string? Reason
-);public record CreateUserSubscriptionRequest(
+);
+
+public record CreateUserSubscriptionRequest(
     Guid UserId,
     Guid PlanId,
     DateTime StartDate,
