@@ -5,6 +5,7 @@ using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Common.Models;
 using Demif.Domain.Entities;
 using Demif.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -156,7 +157,22 @@ public class SePayWebhookService
         // 3. Assign Premium role
         await AssignPremiumRoleAsync(payment.UserId, roleExpiresAt, cancellationToken);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogWarning(ex,
+                "Concurrency conflict while processing SEPay webhook for payment {PaymentReference}. Acking as success to keep webhook idempotent.",
+                payment.PaymentReference);
+
+            return Result.Success(new SePayWebhookResponse
+            {
+                Success = true,
+                Message = "Webhook already processed"
+            });
+        }
 
         _logger.LogInformation("Payment processed successfully: {Code}", request.Code ?? request.Content);
         return Result.Success(new SePayWebhookResponse { Success = true, Message = "Payment processed" });
