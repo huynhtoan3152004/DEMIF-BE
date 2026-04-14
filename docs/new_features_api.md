@@ -57,12 +57,23 @@ Giúp User nghe hay làm bài dở dang vẫn có thể quay lại học tiếp 
 {
   "userId": "3fa85f64...",
   "lessonId": "b1b85f64...",
+  "lessonTitle": "Lesson title",
+  "lessonLevel": "Beginner",
   "status": "InProgress", // Sẽ trả về "Completed" nếu truyền isCompleted: true
-  "lastSegmentIndex": 3
+  "lastSegmentIndex": 3,
+  "totalSegments": 12,
+  "completedSegments": 4,
+  "remainingSegments": 8,
+  "progressPercent": 33.3,
+  "isLessonCompleted": false,
+  "nextUncompletedSegmentIndex": 4,
+  "completedSegmentIndexes": [0, 1, 2, 3],
+  "remainingSegmentIndexes": [4, 5, 6, 7, 8, 9, 10, 11]
 }
 ```
 - **Lỗi có thể gặp:**
   - `400 Bad Request`: `{ "error": "Lesson.NotFound", "message": "Không tìm thấy bài học này." }` (URL truyền sai ID của lesson).
+  - `400 Bad Request`: `{ "error": "SegmentIndex '99' không hợp lệ. Bài này chỉ có 12 segment(s)." }` (segmentIndex vượt quá số segment của bài).
 
 ---
 

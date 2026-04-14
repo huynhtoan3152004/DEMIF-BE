@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Common.Models;
 using Demif.Domain.Entities;
@@ -21,14 +22,53 @@ public class SyncProgressService
         SyncProgressRequest request, 
         CancellationToken cancellationToken = default)
     {
-        // 1. Kiểm tra bài học tồn tại
-        var lessonExists = await _dbContext.Lessons.AnyAsync(l => l.Id == lessonId, cancellationToken);
-        if (!lessonExists)
+        // 1. Load lesson để lấy metadata + số segment
+        var lesson = await _dbContext.Lessons
+            .Where(l => l.Id == lessonId)
+            .Select(l => new
+            {
+                l.Id,
+                l.Title,
+                l.Level,
+                l.TimedTranscript
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (lesson is null)
             return Result.Failure<SyncProgressResponse>(Error.NotFound("Lesson.NotFound", "Không tìm thấy bài học này."));
 
-        // 2. Upsert UserLessonTracker
+        var totalSegments = GetTotalSegments(lesson.TimedTranscript);
+        if (totalSegments > 0 && request.SegmentIndex >= totalSegments)
+        {
+            return Result.Failure<SyncProgressResponse>(
+                Error.Validation($"SegmentIndex '{request.SegmentIndex}' không hợp lệ. Bài này chỉ có {totalSegments} segment(s)."));
+        }
+
+        if (request.SegmentIndex < 0)
+        {
+            return Result.Failure<SyncProgressResponse>(
+                Error.Validation("SegmentIndex phải lớn hơn hoặc bằng 0."));
+        }
+
+        var completedSegmentIndexesQuery = _dbContext.UserExercises
+            .Where(e => e.UserId == userId
+                     && e.LessonId == lessonId
+                     && e.SegmentIndex != null)
+            .Select(e => e.SegmentIndex!.Value)
+            .Distinct();
+
+        var completedSegmentIndexes = await completedSegmentIndexesQuery
+            .OrderBy(index => index)
+            .ToListAsync(cancellationToken);
+
         var tracker = await _dbContext.UserLessonTrackers
             .FirstOrDefaultAsync(t => t.UserId == userId && t.LessonId == lessonId, cancellationToken);
+
+        var inferredStatus = request.IsCompleted
+            ? LessonProgressStatus.Completed
+            : request.SegmentIndex <= 0
+                ? LessonProgressStatus.Started
+                : LessonProgressStatus.InProgress;
 
         if (tracker == null)
         {
@@ -36,7 +76,7 @@ public class SyncProgressService
             {
                 UserId = userId,
                 LessonId = lessonId,
-                Status = request.IsCompleted ? LessonProgressStatus.Completed : LessonProgressStatus.InProgress,
+                Status = inferredStatus,
                 LastSegmentIndex = request.SegmentIndex,
                 StartedAt = DateTime.UtcNow
             };
@@ -59,17 +99,72 @@ public class SyncProgressService
             {
                 tracker.Status = LessonProgressStatus.InProgress;
             }
+            else if (!request.IsCompleted && tracker.Status == LessonProgressStatus.NotStarted)
+            {
+                tracker.Status = inferredStatus;
+                tracker.StartedAt = DateTime.UtcNow;
+            }
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        if (tracker.Status == LessonProgressStatus.Completed && totalSegments > 0)
+        {
+            completedSegmentIndexes = Enumerable.Range(0, totalSegments).ToList();
+        }
+
+        var remainingSegmentIndexes = totalSegments > 0
+            ? Enumerable.Range(0, totalSegments)
+                .Except(completedSegmentIndexes)
+                .ToList()
+            : new List<int>();
+
+        var nextUncompletedSegmentIndex = remainingSegmentIndexes.FirstOrDefault();
+        var hasRemainingSegments = remainingSegmentIndexes.Count > 0;
+        var completedCount = totalSegments > 0
+            ? completedSegmentIndexes.Count
+            : 0;
+        var progressPercent = totalSegments > 0
+            ? Math.Round((double)completedCount / totalSegments * 100, 1)
+            : 0;
 
         return Result.Success(new SyncProgressResponse
         {
             UserId = userId,
             LessonId = lessonId,
+            LessonTitle = lesson.Title,
+            LessonLevel = lesson.Level.ToString(),
             Status = tracker.Status.ToString(),
-            LastSegmentIndex = tracker.LastSegmentIndex
+            LastSegmentIndex = tracker.LastSegmentIndex,
+            TotalSegments = totalSegments,
+            CompletedSegments = completedCount,
+            RemainingSegments = totalSegments > 0 ? totalSegments - completedCount : 0,
+            ProgressPercent = progressPercent,
+            IsLessonCompleted = tracker.Status == LessonProgressStatus.Completed,
+            NextUncompletedSegmentIndex = hasRemainingSegments ? nextUncompletedSegmentIndex : null,
+            CompletedSegmentIndexes = completedSegmentIndexes,
+            RemainingSegmentIndexes = remainingSegmentIndexes
         });
+    }
+
+    private static int GetTotalSegments(string? timedTranscript)
+    {
+        if (string.IsNullOrWhiteSpace(timedTranscript))
+            return 0;
+
+        try
+        {
+            var segments = JsonSerializer.Deserialize<List<TimedSegment>>(timedTranscript, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            return segments?.Count ?? 0;
+        }
+        catch
+        {
+            return 0;
+        }
     }
 }
 
@@ -83,6 +178,16 @@ public class SyncProgressResponse
 {
     public Guid UserId { get; set; }
     public Guid LessonId { get; set; }
+    public string LessonTitle { get; set; } = string.Empty;
+    public string LessonLevel { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public int LastSegmentIndex { get; set; }
+    public int TotalSegments { get; set; }
+    public int CompletedSegments { get; set; }
+    public int RemainingSegments { get; set; }
+    public double ProgressPercent { get; set; }
+    public bool IsLessonCompleted { get; set; }
+    public int? NextUncompletedSegmentIndex { get; set; }
+    public List<int> CompletedSegmentIndexes { get; set; } = new();
+    public List<int> RemainingSegmentIndexes { get; set; } = new();
 }
