@@ -19,6 +19,7 @@ public class UserVocabulary : AuditableEntity
 
     public int ReviewCount { get; set; }
     public int CorrectReviews { get; set; }
+    public int ConsecutiveCorrect { get; set; }
     public bool IsMastered { get; set; }
     public DateTime? LastReviewedAt { get; set; }
     public DateTime? NextReviewAt { get; set; }
