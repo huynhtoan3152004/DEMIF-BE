@@ -235,9 +235,18 @@ public class AdminUserSubscriptionService
         if (!planExists)
             return Result.Failure(new Error("Admin.Subscription.PlanNotFound", "Subscription plan not found."));
 
-        var sub = await _subscriptionRepo.GetByIdAsync(id, ct);
+        var sub = await _subscriptionRepo.GetByIdWithDetailsAsync(id, ct);
         if (sub is null)
             return Result.Failure(new Error("Admin.Subscription.NotFound", "Subscription not found."));
+
+        // Chỉ cho phép chỉnh sửa các subscription chưa phát sinh giao dịch.
+        // Subscription đã dùng rồi phải đi qua Extend/Cancel để tránh phá dữ liệu lịch sử.
+        if (sub.Status != SubscriptionStatus.PendingPayment || sub.Payments.Any())
+        {
+            return Result.Failure(new Error(
+                "Admin.Subscription.Locked",
+                "Subscription đã được sử dụng nên không thể chỉnh sửa trực tiếp. Hãy dùng Extend/Cancel hoặc tạo subscription mới."));
+        }
 
         // 2. Strict Overwrite Rule: Nếu đổi Status thành Active, càn quét các gói cũ
         if (request.Status == SubscriptionStatus.Active && sub.Status != SubscriptionStatus.Active)

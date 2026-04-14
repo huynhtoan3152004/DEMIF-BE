@@ -3,6 +3,8 @@ using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Features.Admin.UserSubscriptions;
 using Demif.Domain.Entities;
 using Demif.Domain.Enums;
+using Demif.Tests.Helpers;
+using Microsoft.EntityFrameworkCore;
 using Moq;
 
 namespace Demif.Tests.Admin;
@@ -297,6 +299,134 @@ public class AdminUserSubscriptionServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(SubscriptionStatus.Cancelled, sub.Status);
+    }
+
+    // ── UpdateAsync ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task UpdateAsync_UsedSubscription_ReturnsLockedFailure()
+    {
+        var planId = Guid.NewGuid();
+        var id = Guid.NewGuid();
+
+        var options = new DbContextOptionsBuilder<TestDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+
+        using var context = new TestDbContext(options);
+        context.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = planId,
+            Name = "Premium Monthly",
+            Tier = SubscriptionTier.Premium,
+            Price = 299000,
+            Currency = "VND",
+            BillingCycle = BillingCycle.Monthly,
+            IsActive = true
+        });
+        await context.SaveChangesAsync();
+
+        var sub = BuildSubscription(SubscriptionStatus.Active, id);
+        sub.PlanId = planId;
+        sub.Payments.Add(new Payment
+        {
+            Id = Guid.NewGuid(),
+            PlanId = planId,
+            UserId = sub.UserId,
+            Amount = 299000,
+            Currency = "VND",
+            PaymentMethod = "sepay_bank",
+            PaymentReference = "REF-LOCKED",
+            Status = PaymentStatus.Completed
+        });
+
+        _repoMock.Setup(r => r.GetByIdWithDetailsAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+
+        var service = new AdminUserSubscriptionService(
+            _repoMock.Object,
+            _userRepoMock.Object,
+            _roleRepoMock.Object,
+            context);
+
+        var request = new UpdateUserSubscriptionRequest(
+            PlanId: planId,
+            StartDate: DateTime.UtcNow,
+            EndDate: DateTime.UtcNow.AddDays(30),
+            Status: SubscriptionStatus.Active,
+            AutoRenew: true);
+
+        var result = await service.UpdateAsync(id, request);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Admin.Subscription.Locked", result.Error.Code);
+        _repoMock.Verify(r => r.UpdateAsync(It.IsAny<UserSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_PendingSubscriptionWithoutPayments_AllowsUpdate()
+    {
+        var planId = Guid.NewGuid();
+        var id = Guid.NewGuid();
+
+        var options = new DbContextOptionsBuilder<TestDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+
+        using var context = new TestDbContext(options);
+        context.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = planId,
+            Name = "Premium Monthly",
+            Tier = SubscriptionTier.Premium,
+            Price = 299000,
+            Currency = "VND",
+            BillingCycle = BillingCycle.Monthly,
+            IsActive = true
+        });
+        await context.SaveChangesAsync();
+
+        var sub = BuildSubscription(SubscriptionStatus.PendingPayment, id);
+        sub.PlanId = planId;
+
+        _repoMock.Setup(r => r.GetByIdWithDetailsAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+        _repoMock.Setup(r => r.GetByUserIdAsync(sub.UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserSubscription>());
+        _repoMock.Setup(r => r.UpdateAsync(It.IsAny<UserSubscription>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _roleRepoMock.Setup(r => r.GetByNameAsync("Premium", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Role { Id = Guid.NewGuid(), Name = "Premium" });
+
+        var user = new User
+        {
+            Id = sub.UserId,
+            Email = "user@test.com",
+            Username = "testuser",
+            PasswordHash = "hash",
+            UserRoles = new List<UserRole>()
+        };
+        _userRepoMock.Setup(r => r.GetByIdWithRolesAsync(sub.UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var service = new AdminUserSubscriptionService(
+            _repoMock.Object,
+            _userRepoMock.Object,
+            _roleRepoMock.Object,
+            context);
+
+        var request = new UpdateUserSubscriptionRequest(
+            PlanId: planId,
+            StartDate: DateTime.UtcNow,
+            EndDate: DateTime.UtcNow.AddDays(30),
+            Status: SubscriptionStatus.Active,
+            AutoRenew: true);
+
+        var result = await service.UpdateAsync(id, request);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SubscriptionStatus.Active, sub.Status);
+        Assert.True(sub.AutoRenew);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

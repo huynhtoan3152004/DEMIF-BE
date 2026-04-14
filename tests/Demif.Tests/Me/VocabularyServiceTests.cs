@@ -53,7 +53,34 @@ public class VocabularyServiceTests
         Assert.Equal("travel", result.Value.Topic);
         Assert.Equal("Journey", result.Value.Word);
         Assert.Single(context.UserVocabularies);
-        Assert.NotNull(result.Value.NextReviewAt);
+        Assert.Null(result.Value.NextReviewAt);
+    }
+
+    [Fact]
+    public async Task SaveAsync_NewItemAppearsInDueListImmediately()
+    {
+        var context = CreateDbContext();
+        var lesson = CreatePublishedLesson(Guid.NewGuid(), "travel");
+        context.Lessons.Add(lesson);
+        await context.SaveChangesAsync();
+
+        var service = new VocabularyService(context);
+
+        var saveResult = await service.SaveAsync(_userId, new SaveVocabularyRequest
+        {
+            LessonId = lesson.Id,
+            Word = "Journey",
+            Topic = "travel",
+            Meaning = "hành trình"
+        });
+
+        Assert.True(saveResult.IsSuccess);
+
+        var dueResult = await service.GetAsync(_userId, new VocabularyQueryRequest(), dueOnly: true);
+
+        Assert.True(dueResult.IsSuccess);
+        Assert.Single(dueResult.Value.Items);
+        Assert.Equal("Journey", dueResult.Value.Items[0].Word);
     }
 
     [Fact]

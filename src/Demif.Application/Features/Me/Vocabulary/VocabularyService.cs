@@ -86,7 +86,7 @@ public class VocabularyService
                 CorrectReviews = 0,
                 ConsecutiveCorrect = 0,
                 IsMastered = false,
-                NextReviewAt = now.AddDays(1)
+                NextReviewAt = null
             };
 
             _dbContext.UserVocabularies.Add(item);
