@@ -164,7 +164,19 @@ public class AdminUserSubscriptionService
 
     public async Task<Result<Guid>> CreateAsync(CreateUserSubscriptionRequest request, CancellationToken ct = default)
     {
-        // 1. Auto-expire old active/pending subscriptions
+        // 1. Validations
+        if (request.EndDate.HasValue && request.EndDate.Value <= request.StartDate)
+            return Result.Failure<Guid>(new Error("Admin.Subscription.InvalidDates", "End date must be greater than start date."));
+
+        var userExists = await _context.Users.AnyAsync(u => u.Id == request.UserId, ct);
+        if (!userExists)
+            return Result.Failure<Guid>(new Error("Admin.Subscription.UserNotFound", "User not found."));
+
+        var plan = await _context.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == request.PlanId, ct);
+        if (plan is null)
+            return Result.Failure<Guid>(new Error("Admin.Subscription.PlanNotFound", "Subscription plan not found."));
+
+        // 2. Auto-expire old active/pending subscriptions
         var existingSubs = await _subscriptionRepo.GetByUserIdAsync(request.UserId, ct);
         foreach (var existing in existingSubs.Where(s => s.Status is SubscriptionStatus.Active or SubscriptionStatus.PendingPayment))
         {
@@ -173,7 +185,7 @@ public class AdminUserSubscriptionService
             await _subscriptionRepo.UpdateAsync(existing, ct);
         }
 
-        // 2. Create new subscription
+        // 3. Create new subscription
         var sub = new UserSubscription
         {
             UserId = request.UserId,
@@ -187,7 +199,26 @@ public class AdminUserSubscriptionService
 
         await _subscriptionRepo.AddAsync(sub, ct);
         
-        // 3. Sync role
+        // 4. Sinh hóa đơn thủ công (Virtual Payment) nếu cấp gói Active
+        if (request.Status == SubscriptionStatus.Active)
+        {
+            var payment = new Payment
+            {
+                UserId = request.UserId,
+                PlanId = request.PlanId,
+                SubscriptionId = sub.Id,
+                Amount = 0, // Gói gán thủ công trị giá 0đ trên bill
+                Currency = plan.Currency ?? "VND",
+                PaymentMethod = "admin_manual",
+                Status = PaymentStatus.Completed,
+                PaymentReference = $"ADMIN_{Guid.NewGuid():N}",
+                CompletedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.Payments.Add(payment);
+        }
+
+        // 5. Sync role
         await SyncUserRoleAsync(request.UserId, ct);
         
         await _context.SaveChangesAsync(ct);
@@ -196,9 +227,29 @@ public class AdminUserSubscriptionService
 
     public async Task<Result> UpdateAsync(Guid id, UpdateUserSubscriptionRequest request, CancellationToken ct = default)
     {
+        // 1. Validations
+        if (request.EndDate.HasValue && request.EndDate.Value <= request.StartDate)
+            return Result.Failure(new Error("Admin.Subscription.InvalidDates", "End date must be greater than start date."));
+
+        var planExists = await _context.SubscriptionPlans.AnyAsync(p => p.Id == request.PlanId, ct);
+        if (!planExists)
+            return Result.Failure(new Error("Admin.Subscription.PlanNotFound", "Subscription plan not found."));
+
         var sub = await _subscriptionRepo.GetByIdAsync(id, ct);
         if (sub is null)
             return Result.Failure(new Error("Admin.Subscription.NotFound", "Subscription not found."));
+
+        // 2. Strict Overwrite Rule: Nếu đổi Status thành Active, càn quét các gói cũ
+        if (request.Status == SubscriptionStatus.Active && sub.Status != SubscriptionStatus.Active)
+        {
+            var existingSubs = await _subscriptionRepo.GetByUserIdAsync(sub.UserId, ct);
+            foreach (var existing in existingSubs.Where(s => s.Id != sub.Id && s.Status is SubscriptionStatus.Active or SubscriptionStatus.PendingPayment))
+            {
+                existing.Status = SubscriptionStatus.Expired;
+                existing.UpdatedAt = DateTime.UtcNow;
+                await _subscriptionRepo.UpdateAsync(existing, ct);
+            }
+        }
 
         sub.PlanId = request.PlanId;
         sub.StartDate = request.StartDate;
@@ -209,7 +260,7 @@ public class AdminUserSubscriptionService
 
         await _subscriptionRepo.UpdateAsync(sub, ct);
 
-        // Sync role
+        // 3. Sync role
         await SyncUserRoleAsync(sub.UserId, ct);
 
         await _context.SaveChangesAsync(ct);
