@@ -1,4 +1,3 @@
-using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Features.Payments.Webhook;
 using Demif.Domain.Entities;
@@ -24,43 +23,67 @@ public class SePayWebhookServiceTests
         var subscriptionRepo = new Mock<IUserSubscriptionRepository>();
         var userRepo = new Mock<IUserRepository>();
         var roleRepo = new Mock<IRoleRepository>();
-        var dbContext = new Mock<IApplicationDbContext>();
+        var dbContext = new Mock<Demif.Application.Abstractions.Persistence.IApplicationDbContext>();
+
+        var payment = new Payment
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            PlanId = planId,
+            SubscriptionId = subscriptionId,
+            PaymentReference = paymentReference,
+            Amount = 19000,
+            Currency = "VND",
+            PaymentMethod = "sepay_bank",
+            Status = PaymentStatus.Pending,
+            CreatedAt = DateTime.UtcNow.AddMinutes(-5)
+        };
 
         paymentRepo.Setup(r => r.GetByReferenceAsync(paymentReference, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Payment
+            .ReturnsAsync(payment);
+        paymentRepo.Setup(r => r.UpdateAsync(It.IsAny<Payment>(), It.IsAny<CancellationToken>()))
+            .Callback<Payment, CancellationToken>((updated, _) =>
             {
-                Id = Guid.NewGuid(),
-                UserId = userId,
-                PlanId = planId,
-                SubscriptionId = subscriptionId,
-                PaymentReference = paymentReference,
-                Amount = 19000,
+                payment.Status = updated.Status;
+                payment.TransactionId = updated.TransactionId;
+                payment.BankCode = updated.BankCode;
+                payment.BankTransactionNo = updated.BankTransactionNo;
+                payment.GatewayResponse = updated.GatewayResponse;
+                payment.CompletedAt = updated.CompletedAt;
+            })
+            .Returns(Task.CompletedTask);
+
+        var subscription = new UserSubscription
+        {
+            Id = subscriptionId,
+            UserId = userId,
+            PlanId = planId,
+            Status = SubscriptionStatus.PendingPayment,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow.AddDays(30),
+            Plan = new SubscriptionPlan
+            {
+                Id = planId,
+                Name = "Monthly",
+                Tier = SubscriptionTier.Premium,
+                Price = 19000,
                 Currency = "VND",
-                PaymentMethod = "sepay_bank",
-                Status = PaymentStatus.Pending,
-                CreatedAt = DateTime.UtcNow.AddMinutes(-5)
-            });
+                BillingCycle = BillingCycle.Monthly,
+                IsActive = true
+            }
+        };
 
         subscriptionRepo.Setup(r => r.GetByIdWithPlanAsync(subscriptionId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserSubscription
+            .ReturnsAsync(subscription);
+        subscriptionRepo.Setup(r => r.UpdateAsync(It.IsAny<UserSubscription>(), It.IsAny<CancellationToken>()))
+            .Callback<UserSubscription, CancellationToken>((updated, _) =>
             {
-                Id = subscriptionId,
-                UserId = userId,
-                PlanId = planId,
-                Status = SubscriptionStatus.PendingPayment,
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow.AddDays(30),
-                Plan = new SubscriptionPlan
-                {
-                    Id = planId,
-                    Name = "Monthly",
-                    Tier = SubscriptionTier.Premium,
-                    Price = 19000,
-                    Currency = "VND",
-                    BillingCycle = BillingCycle.Monthly,
-                    IsActive = true
-                }
-            });
+                subscription.Status = updated.Status;
+                subscription.StartDate = updated.StartDate;
+                subscription.EndDate = updated.EndDate;
+                subscription.UpdatedAt = updated.UpdatedAt;
+            })
+            .Returns(Task.CompletedTask);
 
         userRepo.Setup(r => r.GetByIdWithRolesAsync(userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new User
@@ -79,8 +102,8 @@ public class SePayWebhookServiceTests
                 Name = "Premium"
             });
 
-        dbContext.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new DbUpdateConcurrencyException("expected to affect 1 row but affected 0 rows"));
+        userRepo.Setup(r => r.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
 
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -113,6 +136,8 @@ public class SePayWebhookServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.True(result.Value.Success);
-        Assert.Equal("Webhook already processed", result.Value.Message);
+        Assert.Equal("Payment processed", result.Value.Message);
+        Assert.Equal(PaymentStatus.Completed, payment.Status);
+        Assert.Equal(SubscriptionStatus.Active, subscription.Status);
     }
 }

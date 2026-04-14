@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Common.Models;
@@ -121,64 +119,119 @@ public class SePayWebhookService
         SePayWebhookRequest request,
         CancellationToken cancellationToken)
     {
-        // 1. Update payment
-        payment.Status = PaymentStatus.Completed;
-        payment.TransactionId = request.Id.ToString(); // Set Id from SePay
-        payment.BankCode = request.Gateway;           // VCB, TPB...
-        payment.BankTransactionNo = request.ReferenceCode; // SMS Reference code
-        payment.GatewayResponse = System.Text.Json.JsonSerializer.Serialize(request);
-        payment.CompletedAt = DateTime.UtcNow;
-
-        // 2. Activate subscription
-        DateTime? roleExpiresAt = null;
-        if (payment.SubscriptionId.HasValue)
+        for (var attempt = 1; attempt <= 2; attempt++)
         {
-            var subscription = await _subscriptionRepository.GetByIdWithPlanAsync(payment.SubscriptionId.Value, cancellationToken);
-            if (subscription is not null)
+            try
             {
-                subscription.Status = SubscriptionStatus.Active;
-                subscription.StartDate = DateTime.UtcNow;
-                
-                // Recalculate EndDate based on actual actvation time
-                if (subscription.Plan?.BillingCycle.GetDurationDays().HasValue == true)
+                var paymentCompletedNow = await EnsurePaymentCompletedAsync(payment, request, cancellationToken);
+                var roleExpiresAt = await EnsureSubscriptionActivatedAsync(payment, cancellationToken);
+                await EnsurePremiumRoleAsync(payment.UserId, roleExpiresAt, cancellationToken);
+
+                _logger.LogInformation(
+                    paymentCompletedNow
+                        ? "Payment processed successfully: {Code}"
+                        : "Payment already completed, ensured related subscription/role state: {Code}",
+                    request.Code ?? request.Content);
+
+                return Result.Success(new SePayWebhookResponse
                 {
-                    subscription.EndDate = DateTime.UtcNow.AddDays(subscription.Plan.BillingCycle.GetDurationDays()!.Value);
-                }
-                else 
+                    Success = true,
+                    Message = paymentCompletedNow ? "Payment processed" : "Webhook already processed"
+                });
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                _logger.LogWarning(ex,
+                    "Concurrency conflict while processing SEPay webhook for payment {PaymentReference} (attempt {Attempt}). Retrying with fresh state.",
+                    payment.PaymentReference,
+                    attempt);
+
+                if (_dbContext is DbContext efDbContext)
                 {
-                    subscription.EndDate = null;
+                    efDbContext.ChangeTracker.Clear();
                 }
-                
-                subscription.UpdatedAt = DateTime.UtcNow;
-                roleExpiresAt = subscription.EndDate;
+
+                var freshPayment = await _paymentRepository.GetByReferenceAsync(payment.PaymentReference, cancellationToken);
+                if (freshPayment is null)
+                {
+                    return Result.Success(new SePayWebhookResponse
+                    {
+                        Success = true,
+                        Message = "Payment not found but ack"
+                    });
+                }
+
+                payment = freshPayment;
             }
         }
 
-        // 3. Assign Premium role
-        await AssignPremiumRoleAsync(payment.UserId, roleExpiresAt, cancellationToken);
-
-        try
+        return Result.Success(new SePayWebhookResponse
         {
-            await _dbContext.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateConcurrencyException ex)
-        {
-            _logger.LogWarning(ex,
-                "Concurrency conflict while processing SEPay webhook for payment {PaymentReference}. Acking as success to keep webhook idempotent.",
-                payment.PaymentReference);
-
-            return Result.Success(new SePayWebhookResponse
-            {
-                Success = true,
-                Message = "Webhook already processed"
-            });
-        }
-
-        _logger.LogInformation("Payment processed successfully: {Code}", request.Code ?? request.Content);
-        return Result.Success(new SePayWebhookResponse { Success = true, Message = "Payment processed" });
+            Success = true,
+            Message = "Webhook already processed"
+        });
     }
 
-    private async Task AssignPremiumRoleAsync(Guid userId, DateTime? expiresAt, CancellationToken cancellationToken)
+    private async Task<bool> EnsurePaymentCompletedAsync(
+        Payment payment,
+        SePayWebhookRequest request,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var shouldUpdate = payment.Status != PaymentStatus.Completed
+            || payment.TransactionId != request.Id.ToString()
+            || payment.BankCode != request.Gateway
+            || payment.BankTransactionNo != request.ReferenceCode
+            || payment.CompletedAt is null;
+
+        if (!shouldUpdate)
+        {
+            return false;
+        }
+
+        payment.Status = PaymentStatus.Completed;
+        payment.TransactionId = request.Id.ToString();
+        payment.BankCode = request.Gateway;
+        payment.BankTransactionNo = request.ReferenceCode;
+        payment.GatewayResponse = System.Text.Json.JsonSerializer.Serialize(request);
+        payment.CompletedAt = now;
+
+        await _paymentRepository.UpdateAsync(payment, cancellationToken);
+        return true;
+    }
+
+    private async Task<DateTime?> EnsureSubscriptionActivatedAsync(Payment payment, CancellationToken cancellationToken)
+    {
+        if (!payment.SubscriptionId.HasValue)
+            return null;
+
+        var subscription = await _subscriptionRepository.GetByIdWithPlanAsync(payment.SubscriptionId.Value, cancellationToken);
+        if (subscription is null)
+            return null;
+
+        var now = DateTime.UtcNow;
+        DateTime? targetEndDate = subscription.Plan?.BillingCycle.GetDurationDays().HasValue == true
+            ? now.AddDays(subscription.Plan.BillingCycle.GetDurationDays()!.Value)
+            : null;
+
+        var shouldUpdate = subscription.Status != SubscriptionStatus.Active
+            || subscription.StartDate == default
+            || subscription.EndDate != targetEndDate
+            || subscription.UpdatedAt is null;
+
+        if (!shouldUpdate)
+            return subscription.EndDate;
+
+        subscription.Status = SubscriptionStatus.Active;
+        subscription.StartDate = now;
+        subscription.EndDate = targetEndDate;
+        subscription.UpdatedAt = now;
+
+        await _subscriptionRepository.UpdateAsync(subscription, cancellationToken);
+        return subscription.EndDate;
+    }
+
+    private async Task EnsurePremiumRoleAsync(Guid userId, DateTime? expiresAt, CancellationToken cancellationToken)
     {
         var user = await _userRepository.GetByIdWithRolesAsync(userId, cancellationToken);
         if (user is null) return;
@@ -208,6 +261,8 @@ public class SePayWebhookService
             // Update expiration if role already exists
             existingRole.ExpiresAt = expiresAt;
         }
+
+        await _userRepository.UpdateAsync(user, cancellationToken);
     }
 
     // Gỡ bỏ Verify Signature vì ta đổi qua dùng chứng thực API Key headers
