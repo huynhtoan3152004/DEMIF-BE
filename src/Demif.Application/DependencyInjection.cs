@@ -47,6 +47,13 @@ using Demif.Application.Features.Me.Vocabulary;
 using Demif.Application.Features.Admin.UserSubscriptions;
 using Demif.Application.Features.Admin.Payments;
 using Demif.Application.Features.Admin.Notifications;
+using Demif.Application.Features.Admin.Analytics.Content;
+using Demif.Application.Features.Admin.Analytics.Lessons;
+using Demif.Application.Features.Admin.Analytics.Lessons.Access;
+using Demif.Application.Features.Admin.Analytics.Overview;
+using Demif.Application.Features.Admin.Analytics.Payments;
+using Demif.Application.Features.Admin.Analytics.Users;
+using Demif.Application.Features.Admin.Analytics.Vocabulary;
 using Demif.Application.Features.Subscriptions.ExpiryCleanup;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -110,6 +117,7 @@ public static class DependencyInjection
         services.AddScoped<Demif.Application.Features.Lessons.Tracking.GetCompletedSegmentsService>();
         services.AddScoped<Demif.Application.Features.Lessons.Tracking.GetLessonHistoryService>();
         services.AddScoped<Demif.Application.Features.Lessons.Tracking.XpService>();
+        services.AddScoped<Demif.Application.Features.Lessons.Tracking.RecordLessonAccessService>();
 
         // Payment Services
         services.AddScoped<SePayWebhookService>();
@@ -154,6 +162,13 @@ public static class DependencyInjection
         
         // Admin Analytics
         services.AddScoped<Demif.Application.Features.Admin.Analytics.GetAdminAnalyticsService>();
+        services.AddScoped<GetAdminAnalyticsOverviewService>();
+        services.AddScoped<GetAdminUserAnalyticsService>();
+        services.AddScoped<GetAdminLessonAnalyticsService>();
+        services.AddScoped<GetAdminLessonAccessAnalyticsService>();
+        services.AddScoped<GetAdminVocabularyAnalyticsService>();
+        services.AddScoped<GetAdminPaymentAnalyticsService>();
+        services.AddScoped<GetAdminContentAnalyticsService>();
 
         // Background Job Services
         services.AddScoped<SubscriptionExpiryService>();

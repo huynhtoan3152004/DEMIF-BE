@@ -131,33 +131,89 @@ Hiển thị hệ thống Thống kê chuyên sâu làm biểu đồ tại trang
 - **Response (200 OK):**
 ```json
 {
-  "dailyActiveUsers": 142,      // Người truy cập (Đăng nhập) trong hôm nay
-  "monthlyActiveUsers": 500,    // Trong tháng hiện tại
-  "totalUsers": 1500,           // Toàn hệ thống
-  "difficultLessons": [         // Top 5 Bài học bị đánh rớt nhiều / điểm lè tè
+  "generatedAt": "2026-03-04T10:00:00Z",
+  "summary": {
+    "totalUsers": 1500,
+    "activeUsers": 930,
+    "newUsersToday": 24,
+    "totalLessons": 180,
+    "publishedLessons": 160,
+    "totalExercises": 12040,
+    "totalVocabulary": 8600,
+    "dueVocabulary": 420,
+    "activeSubscriptions": 280,
+    "expiringSubscriptionsSoon": 18,
+    "totalRevenue": 20000000,
+    "pendingPayments": 6,
+    "totalBlogs": 42
+  },
+  "users": {
+    "dailyActiveUsers": 142,
+    "monthlyActiveUsers": 500,
+    "usersActiveInLast7Days": 310,
+    "byStatus": [
+      { "key": "Active", "count": 930 },
+      { "key": "Pending", "count": 48 }
+    ],
+    "byAuthProvider": [
+      { "key": "email", "count": 1200 },
+      { "key": "google", "count": 300 }
+    ],
+    "byLevel": [
+      { "key": "Beginner", "count": 760 },
+      { "key": "Intermediate", "count": 510 }
+    ]
+  },
+  "lessons": {
+    "publishedLessons": 160,
+    "draftLessons": 12,
+    "archivedLessons": 8,
+    "dictationLessons": 94,
+    "shadowingLessons": 86,
+    "averageScore": 74.3,
+    "popularLessons": [
+      {
+        "lessonId": "b1b222...",
+        "title": "Daily Greeting",
+        "avgScore": 8.0,
+        "completionsCount": 350
+      }
+    ],
+    "difficultLessons": [
+      {
+        "lessonId": "b1b85f64...",
+        "title": "Business Negotiation 01",
+        "avgScore": 2.5,
+        "completionsCount": 50
+      }
+    ]
+  },
+  "payments": {
+    "totalRevenue": 20000000,
+    "revenueByTier": [
+      { "key": "Premium", "amount": 15000000 },
+      { "key": "Basic", "amount": 5000000 }
+    ],
+    "revenueByBillingCycle": [
+      { "key": "Monthly", "amount": 18000000 },
+      { "key": "Lifetime", "amount": 2000000 }
+    ]
+  },
+  "alerts": [
     {
-      "lessonId": "b1b85f64...",
-      "title": "Business Negotiation 01",
-      "avgScore": 2.5,          // Điểm làm bài quá lẹt đẹt
-      "completionsCount": 50
+      "code": "expiring_subscriptions",
+      "title": "Subscription sắp hết hạn",
+      "message": "Có subscription active sẽ hết hạn trong 30 ngày.",
+      "count": 18,
+      "severity": "warning"
     }
-  ],
-  "popularLessons": [           // Top 5 Bài học được mến mộ luyện đi luyện lại
-    {
-      "lessonId": "b1b222...",
-      "title": "Daily Greeting",
-      "avgScore": 8.0,
-      "completionsCount": 350   // Hoàn thành cả ngàn lần
-    }
-  ],
-  "revenueStats": {
-    "totalRevenue": 20000000, 
-    "premiumRevenue": 15000000, // Doanh thu đến từ Cán mốc gói xịn Premium
-    "proRevenue": 5000000,      // Gói Pro rải rác
-    "otherRevenue": 0
-  }
+  ]
 }
 ```
+- **Frontend rule:** Render theo từng nhóm `summary`, `users`, `lessons`, `exercises`, `vocabulary`, `subscriptions`, `payments`, `blogs`, `notifications`, `engagement`, `alerts`.
+- **Frontend rule:** `lessons.accessStats` là số lượt mở bài được ghi bằng tracker khi user đã đăng nhập mở lesson detail hoặc segments.
+- **Frontend rule:** Không tự suy đoán doanh thu theo tên gói. Backend đã trả `revenueByTier` và `revenueByBillingCycle` từ dữ liệu thật của `SubscriptionPlan` + `Payment`.
+- **Frontend rule:** Dùng các field trạng thái trả từ server (`reviewStatus`, `byStatus`, `byType`, `byChannel`, `byTier`) để đổ chart và filter, tránh map lại bằng logic FE.
 - **Lỗi:**
   - `403 Forbidden` nểu Tài khoản gọi API không phải Admin.
 

@@ -22,6 +22,7 @@ public class LessonsController : ControllerBase
     private readonly GetLessonSegmentsService _getSegmentsService;
     private readonly SyncProgressService _syncProgressService;
     private readonly GetCompletedSegmentsService _completedSegmentsService;
+        private readonly RecordLessonAccessService _recordLessonAccessService;
     private readonly ICurrentUserService _currentUserService;
 
     public LessonsController(
@@ -30,6 +31,7 @@ public class LessonsController : ControllerBase
         GetLessonSegmentsService getSegmentsService,
         SyncProgressService syncProgressService,
         GetCompletedSegmentsService completedSegmentsService,
+        RecordLessonAccessService recordLessonAccessService,
         ICurrentUserService currentUserService)
     {
         _getLessonsService = getLessonsService;
@@ -37,6 +39,7 @@ public class LessonsController : ControllerBase
         _getSegmentsService = getSegmentsService;
         _syncProgressService = syncProgressService;
         _completedSegmentsService = completedSegmentsService;
+        _recordLessonAccessService = recordLessonAccessService;
         _currentUserService = currentUserService;
     }
 
@@ -81,6 +84,11 @@ public class LessonsController : ControllerBase
             };
         }
 
+        if (userId.HasValue)
+        {
+            await _recordLessonAccessService.RecordAsync(userId.Value, id, cancellationToken);
+        }
+
         return Ok(result.Value);
     }
 
@@ -111,6 +119,11 @@ public class LessonsController : ControllerBase
                 "Validation" => BadRequest(new { error = result.Error.Message }),
                 _            => BadRequest(new { error = result.Error.Message })
             };
+        }
+
+        if (userId.HasValue)
+        {
+            await _recordLessonAccessService.RecordAsync(userId.Value, id, cancellationToken);
         }
 
         return Ok(result.Value);

@@ -382,14 +382,14 @@ GET  /api/me/notifications/unread-count → Badge count cho FE
 
 ---
 
-### 11. 📊 ADMIN — Không Có Dashboard Analytics
+### 11. 📊 ADMIN — Dashboard Analytics
 
 **Cần thêm:**
 ```
-GET /api/admin/stats
-→ Revenue tháng này, new users hôm nay, active users 7 ngày, completion rate
-→ Top bài học phổ biến nhất
-→ Conversion rate (free → premium)
+GET /api/admin/analytics
+→ Summary cards: users, lessons, exercises, vocabulary, subscriptions, payments, blogs
+→ Breakdown: users by status/auth/level, lessons by status/type/level/category, payments by status/method/tier
+→ Top difficult/popular lessons, top vocabulary topics, top users, alerts
 ```
 
 ---
