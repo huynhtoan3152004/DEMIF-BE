@@ -14,9 +14,38 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
     {
     }
 
+    private static IQueryable<Lesson> ProjectReadModel(IQueryable<Lesson> query)
+    {
+        return query.Select(l => new Lesson
+        {
+            Id = l.Id,
+            Title = l.Title ?? string.Empty,
+            Description = l.Description,
+            LessonType = l.LessonType ?? "Dictation",
+            Level = l.Level ?? "Beginner",
+            Category = l.Category,
+            AudioUrl = l.AudioUrl ?? string.Empty,
+            DurationSeconds = l.DurationSeconds,
+            ThumbnailUrl = l.ThumbnailUrl,
+            MediaUrl = l.MediaUrl,
+            MediaType = l.MediaType,
+            FullTranscript = l.FullTranscript ?? string.Empty,
+            TimedTranscript = l.TimedTranscript,
+            DictationTemplates = l.DictationTemplates,
+            CompletionsCount = l.CompletionsCount,
+            AvgScore = l.AvgScore,
+            Status = l.Status ?? "published",
+            IsPremiumOnly = l.IsPremiumOnly,
+            DisplayOrder = l.DisplayOrder,
+            Tags = l.Tags,
+            CreatedAt = l.CreatedAt,
+            UpdatedAt = l.UpdatedAt
+        });
+    }
+
     public async Task<IEnumerable<Lesson>> GetByLevelAsync(string level, CancellationToken cancellationToken = default)
     {
-        return await _dbSet
+        return await ProjectReadModel(_dbSet.AsNoTracking())
             .Where(l => l.Level == level && l.Status == "published")
             .OrderBy(l => l.Title)
             .ToListAsync(cancellationToken);
@@ -24,7 +53,7 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
 
     public async Task<IEnumerable<Lesson>> GetByTypeAsync(string type, CancellationToken cancellationToken = default)
     {
-        return await _dbSet
+        return await ProjectReadModel(_dbSet.AsNoTracking())
             .Where(l => l.LessonType == type && l.Status == "published")
             .OrderBy(l => l.Title)
             .ToListAsync(cancellationToken);
@@ -32,7 +61,7 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
 
     public async Task<IEnumerable<Lesson>> GetPublishedAsync(CancellationToken cancellationToken = default)
     {
-        return await _dbSet
+        return await ProjectReadModel(_dbSet.AsNoTracking())
             .Where(l => l.Status == "published")
             .OrderBy(l => l.Title)
             .ToListAsync(cancellationToken);
@@ -51,7 +80,7 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
         string? status = null,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.AsQueryable();
+        var query = ProjectReadModel(_dbSet.AsNoTracking());
 
         if (!string.IsNullOrWhiteSpace(level))
             query = query.Where(l => l.Level == level);
@@ -118,7 +147,7 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
         string? search = null,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.Where(l => l.Status == "published");
+        var query = ProjectReadModel(_dbSet.AsNoTracking().Where(l => l.Status == "published"));
 
         // Guest = chỉ free lessons. Login user = full catalog (FE tự xử lý lock/redirect)
         if (!isLoggedIn)

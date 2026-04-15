@@ -10,23 +10,18 @@ namespace Demif.Api.Controllers.Admin;
 
 /// <summary>
 /// Admin — Quản lý bài học (Lesson Management).
-/// 
-/// ╔══════════════════════════════════════════════════════════════════════╗
-/// ║  QUY TRÌNH TẠO BÀI (HYBRID WORKFLOW)                              ║
-/// ║                                                                    ║
-/// ║  Bước 1: Tạo bài nháp (draft)                                     ║
-/// ║    → POST /quick-create  (paste SRT/VTT + title)                   ║
-/// ║    → POST /from-youtube  (auto-fetch từ YouTube)                   ║
-/// ║                                                                    ║
-/// ║  Bước 2: Moderator chỉnh sửa lỗ hổng đục lỗ                      ║
-/// ║    → PUT  /{id}/dictation-templates  (FE gửi mảng custom)          ║
-/// ║    → POST /{id}/regenerate-templates (reset lại auto-generate)     ║
-/// ║                                                                    ║
-/// ║  Bước 3: Kiểm tra & Xuất bản                                      ║
-/// ║    → GET  /{id}/dictation-preview  (preview như User)              ║
-/// ║    → PATCH /{id}/status            (draft → published/archived)    ║
-/// ╚══════════════════════════════════════════════════════════════════════╝
 /// </summary>
+//
+// QUY TRÌNH TẠO BÀI (HYBRID WORKFLOW)
+// Bước 1: Tạo bài nháp (draft)
+//   → POST /quick-create  (paste SRT/VTT + title)
+//   → POST /from-youtube  (auto-fetch từ YouTube)
+// Bước 2: Moderator chỉnh sửa lỗ hổng đục lỗ
+//   → PUT  /{id}/dictation-templates  (FE gửi mảng custom)
+//   → POST /{id}/regenerate-templates (reset lại auto-generate)
+// Bước 3: Kiểm tra & Xuất bản
+//   → GET  /{id}/dictation-preview  (preview như User)
+//   → PATCH /{id}/status            (draft → published/archived)
 [Route("api/admin/lessons")]
 [ApiController]
 [Authorize(Policy = "RequireModerator")]
@@ -63,6 +58,14 @@ public class AdminLessonsController : ControllerBase
     /// <param name="page">Trang hiện tại (mặc định 1)</param>
     /// <param name="pageSize">Số bài mỗi trang (1-100, mặc định 10)</param>
     /// <param name="status">Lọc theo trạng thái: draft, published, archived (tùy chọn)</param>
+    /// <param name="level">Lọc theo level: Beginner, Intermediate, Advanced, Expert</param>
+    /// <param name="type">Lọc theo lesson type: Dictation, Shadowing</param>
+    /// <param name="category">Lọc theo category</param>
+    /// <param name="mediaType">Lọc theo media type: audio, youtube, video</param>
+    /// <param name="tag">Lọc theo tag</param>
+    /// <param name="search">Tìm theo tiêu đề hoặc mô tả</param>
+    /// <param name="isPremiumOnly">Lọc bài premium</param>
+    /// <param name="cancellationToken">Token hủy request</param>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
@@ -195,6 +198,7 @@ public class AdminLessonsController : ControllerBase
     /// Lấy chi tiết một bài học theo ID (bao gồm cả Transcript, Templates...).
     /// </summary>
     /// <param name="id">Lesson ID (GUID)</param>
+    /// <param name="cancellationToken">Token hủy request</param>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -289,6 +293,7 @@ public class AdminLessonsController : ControllerBase
     /// </summary>
     /// <param name="id">Lesson ID</param>
     /// <param name="request">JSON chứa mảng DictationTemplates đã custom</param>
+    /// <param name="cancellationToken">Token hủy request</param>
     [HttpPut("{id:guid}/dictation-templates")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -398,6 +403,7 @@ public class AdminLessonsController : ControllerBase
     /// </summary>
     /// <param name="id">Lesson ID</param>
     /// <param name="request">Body chứa trường "status": "published" | "draft" | "archived"</param>
+    /// <param name="cancellationToken">Token hủy request</param>
     [HttpPatch("{id:guid}/status")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
