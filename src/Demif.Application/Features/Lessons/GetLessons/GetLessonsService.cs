@@ -1,7 +1,6 @@
 using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Abstractions.Services;
 using Demif.Application.Common.Models;
-using Demif.Domain.Enums;
 
 namespace Demif.Application.Features.Lessons.GetLessons;
 
@@ -31,8 +30,10 @@ public class GetLessonsService
     {
         // Login user = full catalog, Guest = free only
         var isLoggedIn = userId.HasValue;
+        var normalizedLevel = NormalizeLevelFilter(request.Level);
+        var normalizedType = NormalizeLessonTypeFilter(request.Type);
 
-        var cacheKey = $"lessons:{request.Page}:{request.PageSize}:{request.Level}:{request.Type}:{request.Category}:{request.MediaType}:{request.Tag}:{request.Search}:{isLoggedIn}";
+        var cacheKey = $"lessons:{request.Page}:{request.PageSize}:{normalizedLevel}:{normalizedType}:{request.Category}:{request.MediaType}:{request.Tag}:{request.Search}:{isLoggedIn}";
 
         var response = await _cacheService.GetOrCreateAsync(cacheKey, async (ct) =>
         {
@@ -40,8 +41,8 @@ public class GetLessonsService
                 request.Page,
                 request.PageSize,
                 isLoggedIn,
-                request.Level,
-                request.Type,
+                normalizedLevel,
+                normalizedType,
                 request.Category,
             request.MediaType,
             request.Tag,
@@ -97,5 +98,19 @@ public class GetLessonsService
         if (string.IsNullOrWhiteSpace(url)) return null;
         var match = System.Text.RegularExpressions.Regex.Match(url, @"(?:embed|v|vi)[/=]([a-zA-Z0-9_-]{11})");
         return match.Success ? match.Groups[1].Value : null;
+    }
+
+    private static string? NormalizeLevelFilter(string? value)
+    {
+        return LessonValueNormalizer.TryNormalizeLevel(value, out var normalized)
+            ? normalized
+            : string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string? NormalizeLessonTypeFilter(string? value)
+    {
+        return LessonValueNormalizer.TryNormalizeLessonType(value, out var normalized)
+            ? normalized
+            : string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }

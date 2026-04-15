@@ -1,5 +1,3 @@
-using Demif.Domain.Enums;
-
 namespace Demif.Application.Features.Lessons.GetLessons;
 
 /// <summary>
@@ -9,8 +7,8 @@ public class GetLessonsRequest
 {
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 10;
-    public Level? Level { get; set; }
-    public LessonType? Type { get; set; }
+    public string? Level { get; set; }
+    public string? Type { get; set; }
     public string? Category { get; set; }
     public string? MediaType { get; set; }
     public string? Tag { get; set; }

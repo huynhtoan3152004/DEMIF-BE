@@ -12,8 +12,8 @@ public class Lesson : AuditableEntity
     public string? Description { get; set; }
 
     // Phân loại
-    public LessonType LessonType { get; set; }
-    public Level Level { get; set; }
+    public string LessonType { get; set; } = "Dictation";
+    public string Level { get; set; } = "Beginner";
     public string? Category { get; set; } // conversation, business, travel, academic
 
     // Media (linh hoạt cho cả audio và video)

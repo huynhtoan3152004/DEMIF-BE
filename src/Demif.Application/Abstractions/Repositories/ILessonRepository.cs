@@ -1,5 +1,4 @@
 using Demif.Domain.Entities;
-using Demif.Domain.Enums;
 
 namespace Demif.Application.Abstractions.Repositories;
 
@@ -8,8 +7,8 @@ namespace Demif.Application.Abstractions.Repositories;
 /// </summary>
 public interface ILessonRepository : IGenericRepository<Lesson>
 {
-    Task<IEnumerable<Lesson>> GetByLevelAsync(Level level, CancellationToken cancellationToken = default);
-    Task<IEnumerable<Lesson>> GetByTypeAsync(LessonType type, CancellationToken cancellationToken = default);
+    Task<IEnumerable<Lesson>> GetByLevelAsync(string level, CancellationToken cancellationToken = default);
+    Task<IEnumerable<Lesson>> GetByTypeAsync(string type, CancellationToken cancellationToken = default);
     Task<IEnumerable<Lesson>> GetPublishedAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -18,8 +17,8 @@ public interface ILessonRepository : IGenericRepository<Lesson>
     Task<(IEnumerable<Lesson> Items, int TotalCount)> GetPaginatedAsync(
         int page,
         int pageSize,
-        Level? level = null,
-        LessonType? type = null,
+        string? level = null,
+        string? type = null,
         string? category = null,
         string? mediaType = null,
         string? tag = null,
@@ -35,8 +34,8 @@ public interface ILessonRepository : IGenericRepository<Lesson>
         int page,
         int pageSize,
         bool isLoggedIn,
-        Level? level = null,
-        LessonType? type = null,
+        string? level = null,
+        string? type = null,
         string? category = null,
         string? mediaType = null,
         string? tag = null,

@@ -2,7 +2,6 @@ using Demif.Application.Abstractions.Repositories;
 using Demif.Application.Abstractions.Services;
 using Demif.Application.Features.Lessons.GetLessons;
 using Demif.Domain.Entities;
-using Demif.Domain.Enums;
 using Moq;
 
 namespace Demif.Tests.Lessons;
@@ -34,8 +33,8 @@ public class GetLessonsServiceTests
                 It.IsAny<int>(),
                 It.IsAny<int>(),
                 It.IsAny<bool>(),
-                It.IsAny<Level?>(),
-                It.IsAny<LessonType?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
                 It.IsAny<string?>(),
                 It.IsAny<string?>(),
                 It.IsAny<string?>(),
@@ -47,8 +46,8 @@ public class GetLessonsServiceTests
         {
             Page = 1,
             PageSize = 10,
-            Level = Level.Beginner,
-            Type = LessonType.Dictation,
+            Level = "Beginner",
+            Type = "Dictation",
             Category = "business",
             MediaType = "audio",
             Tag = "bbc",
@@ -62,12 +61,53 @@ public class GetLessonsServiceTests
             1,
             10,
             false,
-            Level.Beginner,
-            LessonType.Dictation,
+            "Beginner",
+            "Dictation",
             "business",
             "audio",
             "bbc",
             "english",
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NormalizesNumericStringFiltersToCanonicalNames()
+    {
+        _lessonRepoMock
+            .Setup(r => r.GetForUserAsync(
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<bool>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(((IEnumerable<Lesson> Items, int TotalCount))(Array.Empty<Lesson>(), 0));
+
+        var request = new GetLessonsRequest
+        {
+            Page = 1,
+            PageSize = 10,
+            Level = "3",
+            Type = "1"
+        };
+
+        var result = await _service.ExecuteAsync(request, userId: null);
+
+        Assert.True(result.IsSuccess);
+        _lessonRepoMock.Verify(r => r.GetForUserAsync(
+            1,
+            10,
+            false,
+            "Expert",
+            "Shadowing",
+            null,
+            null,
+            null,
+            null,
             It.IsAny<CancellationToken>()), Times.Once);
     }
 }

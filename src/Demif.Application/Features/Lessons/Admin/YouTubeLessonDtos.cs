@@ -1,4 +1,5 @@
 using Demif.Domain.Enums;
+using System.Text.Json.Serialization;
 
 namespace Demif.Application.Features.Lessons.Admin;
 
@@ -22,12 +23,14 @@ public class CreateLessonFromYouTubeRequest
     /// <summary>
     /// Loại bài học
     /// </summary>
-    public LessonType LessonType { get; set; } = LessonType.Dictation;
+    [JsonConverter(typeof(LessonTypeJsonConverter))]
+    public string LessonType { get; set; } = "Dictation";
 
     /// <summary>
     /// Cấp độ mặc định (ảnh hưởng hiển thị, không ảnh hưởng DictationTemplates — templates sinh cho TẤT CẢ levels)
     /// </summary>
-    public Level Level { get; set; } = Level.Beginner;
+    [JsonConverter(typeof(LessonLevelJsonConverter))]
+    public string Level { get; set; } = "Beginner";
 
     /// <summary>
     /// Danh mục: conversation, business, travel, academic, news, entertainment

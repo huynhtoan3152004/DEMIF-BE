@@ -1,5 +1,6 @@
 using Demif.Domain.Enums;
 using Microsoft.AspNetCore.Http;
+using System.Text.Json.Serialization;
 
 namespace Demif.Application.Features.Lessons.Admin;
 
@@ -10,8 +11,11 @@ public class UpdateLessonMetadataRequest
 {
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public LessonType LessonType { get; set; }
-    public Level Level { get; set; }
+    [JsonConverter(typeof(LessonTypeJsonConverter))]
+    public string LessonType { get; set; } = "Dictation";
+
+    [JsonConverter(typeof(LessonLevelJsonConverter))]
+    public string Level { get; set; } = "Beginner";
     public string? Category { get; set; }
     public string AudioUrl { get; set; } = string.Empty;
     public string? MediaUrl { get; set; }

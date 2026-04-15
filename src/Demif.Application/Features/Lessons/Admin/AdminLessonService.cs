@@ -68,8 +68,8 @@ public class AdminLessonService
         int page = 1,
         int pageSize = 10,
         string? status = null,
-        Level? level = null,
-        LessonType? type = null,
+        string? level = null,
+        string? type = null,
         string? category = null,
         string? mediaType = null,
         string? tag = null,
@@ -77,11 +77,14 @@ public class AdminLessonService
         bool? isPremiumOnly = null,
         CancellationToken cancellationToken = default)
     {
+        var normalizedLevel = NormalizeLevelFilter(level);
+        var normalizedType = NormalizeLessonTypeFilter(type);
+
         var (items, totalCount) = await _lessonRepository.GetPaginatedAsync(
             page,
             pageSize,
-            level: level,
-            type: type,
+            level: normalizedLevel,
+            type: normalizedType,
             category: category,
             mediaType: mediaType,
             tag: tag,
@@ -134,8 +137,8 @@ public class AdminLessonService
 
         lesson.Title = request.Title;
         lesson.Description = request.Description;
-        lesson.LessonType = request.LessonType;
-        lesson.Level = request.Level;
+        lesson.LessonType = NormalizeLessonTypeOrThrow(request.LessonType);
+        lesson.Level = NormalizeLevelOrThrow(request.Level);
         lesson.Category = request.Category;
         lesson.AudioUrl = request.AudioUrl;
         lesson.MediaUrl = request.MediaUrl;
@@ -490,8 +493,8 @@ public class AdminLessonService
         {
             Title = request.Title,
             Description = request.Description,
-            LessonType = request.LessonType,
-            Level = request.Level,
+            LessonType = NormalizeLessonTypeOrThrow(request.LessonType),
+            Level = NormalizeLevelOrThrow(request.Level),
             Category = request.Category,
             AudioUrl = request.MediaUrl ?? string.Empty,
             MediaUrl = request.MediaUrl,
@@ -555,8 +558,8 @@ public class AdminLessonService
             Id = lesson.Id,
             Title = lesson.Title,
             Description = lesson.Description,
-            LessonType = lesson.LessonType.ToString(),
-            Level = lesson.Level.ToString(),
+            LessonType = lesson.LessonType,
+            Level = lesson.Level,
             Category = lesson.Category,
             AudioUrl = lesson.AudioUrl,
             MediaUrl = lesson.MediaUrl,
@@ -587,6 +590,40 @@ public class AdminLessonService
         if (string.IsNullOrWhiteSpace(url)) return null;
         var match = System.Text.RegularExpressions.Regex.Match(url, @"(?:embed|v|vi)[/=]([a-zA-Z0-9_-]{11})");
         return match.Success ? match.Groups[1].Value : null;
+    }
+
+    private static string NormalizeLevelOrThrow(string? value)
+    {
+        if (LessonValueNormalizer.TryNormalizeLevel(value, out var normalized))
+        {
+            return normalized;
+        }
+
+        throw new ArgumentException($"Level '{value}' không hợp lệ. Dùng: Beginner, Intermediate, Advanced, Expert hoặc 0-3.");
+    }
+
+    private static string NormalizeLessonTypeOrThrow(string? value)
+    {
+        if (LessonValueNormalizer.TryNormalizeLessonType(value, out var normalized))
+        {
+            return normalized;
+        }
+
+        throw new ArgumentException($"LessonType '{value}' không hợp lệ. Dùng: Dictation, Shadowing hoặc 0-1.");
+    }
+
+    private static string? NormalizeLevelFilter(string? value)
+    {
+        return LessonValueNormalizer.TryNormalizeLevel(value, out var normalized)
+            ? normalized
+            : string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string? NormalizeLessonTypeFilter(string? value)
+    {
+        return LessonValueNormalizer.TryNormalizeLessonType(value, out var normalized)
+            ? normalized
+            : string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }
 

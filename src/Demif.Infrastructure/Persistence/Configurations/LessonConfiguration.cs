@@ -29,6 +29,14 @@ public class LessonConfiguration : IEntityTypeConfiguration<Lesson>
         builder.Property(l => l.Category)
             .HasMaxLength(50);
 
+        builder.Property(l => l.LessonType)
+            .IsRequired()
+            .HasColumnType("text");
+
+        builder.Property(l => l.Level)
+            .IsRequired()
+            .HasColumnType("text");
+
         builder.Property(l => l.Status)
             .HasMaxLength(20)
             .HasDefaultValue("published");

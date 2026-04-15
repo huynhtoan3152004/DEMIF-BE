@@ -1,6 +1,5 @@
 using Demif.Application.Abstractions.Repositories;
 using Demif.Domain.Entities;
-using Demif.Domain.Enums;
 using Demif.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,7 +14,7 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
     {
     }
 
-    public async Task<IEnumerable<Lesson>> GetByLevelAsync(Level level, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<Lesson>> GetByLevelAsync(string level, CancellationToken cancellationToken = default)
     {
         return await _dbSet
             .Where(l => l.Level == level && l.Status == "published")
@@ -23,7 +22,7 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IEnumerable<Lesson>> GetByTypeAsync(LessonType type, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<Lesson>> GetByTypeAsync(string type, CancellationToken cancellationToken = default)
     {
         return await _dbSet
             .Where(l => l.LessonType == type && l.Status == "published")
@@ -42,8 +41,8 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
     public async Task<(IEnumerable<Lesson> Items, int TotalCount)> GetPaginatedAsync(
         int page,
         int pageSize,
-        Level? level = null,
-        LessonType? type = null,
+        string? level = null,
+        string? type = null,
         string? category = null,
         string? mediaType = null,
         string? tag = null,
@@ -54,11 +53,11 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
     {
         var query = _dbSet.AsQueryable();
 
-        if (level.HasValue)
-            query = query.Where(l => l.Level == level.Value);
+        if (!string.IsNullOrWhiteSpace(level))
+            query = query.Where(l => l.Level == level);
 
-        if (type.HasValue)
-            query = query.Where(l => l.LessonType == type.Value);
+        if (!string.IsNullOrWhiteSpace(type))
+            query = query.Where(l => l.LessonType == type);
 
         if (!string.IsNullOrEmpty(category))
             query = query.Where(l => l.Category == category);
@@ -111,8 +110,8 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
         int page,
         int pageSize,
         bool isLoggedIn,
-        Level? level = null,
-        LessonType? type = null,
+        string? level = null,
+        string? type = null,
         string? category = null,
         string? mediaType = null,
         string? tag = null,
@@ -125,11 +124,11 @@ public class LessonRepository : GenericRepository<Lesson>, ILessonRepository
         if (!isLoggedIn)
             query = query.Where(l => !l.IsPremiumOnly);
 
-        if (level.HasValue)
-            query = query.Where(l => l.Level == level.Value);
+        if (!string.IsNullOrWhiteSpace(level))
+            query = query.Where(l => l.Level == level);
 
-        if (type.HasValue)
-            query = query.Where(l => l.LessonType == type.Value);
+        if (!string.IsNullOrWhiteSpace(type))
+            query = query.Where(l => l.LessonType == type);
 
         if (!string.IsNullOrEmpty(category))
             query = query.Where(l => l.Category == category);

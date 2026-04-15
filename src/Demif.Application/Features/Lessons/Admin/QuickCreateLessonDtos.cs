@@ -1,4 +1,5 @@
 using Demif.Domain.Enums;
+using System.Text.Json.Serialization;
 
 namespace Demif.Application.Features.Lessons.Admin;
 
@@ -41,10 +42,12 @@ public class QuickCreateLessonRequest
     public int? DurationSeconds { get; set; }
 
     /// <summary>Cấp độ: Beginner, Intermediate, Advanced, Expert. Mặc định Beginner.</summary>
-    public Level Level { get; set; } = Level.Beginner;
+    [JsonConverter(typeof(LessonLevelJsonConverter))]
+    public string Level { get; set; } = "Beginner";
 
     /// <summary>Loại bài: Dictation, Shadowing. Mặc định Dictation.</summary>
-    public LessonType LessonType { get; set; } = LessonType.Dictation;
+    [JsonConverter(typeof(LessonTypeJsonConverter))]
+    public string LessonType { get; set; } = "Dictation";
 
     /// <summary>Danh mục: conversation, business, travel, academic, news, entertainment</summary>
     public string? Category { get; set; }

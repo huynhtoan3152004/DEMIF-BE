@@ -117,7 +117,7 @@ public class SyncProgressServiceTests
         {
             Id = _lessonId,
             Title = "Test Lesson",
-            Level = Level.Beginner,
+            Level = "Beginner",
             AudioUrl = "https://example.com/audio.mp3",
             FullTranscript = "test",
             TimedTranscript = System.Text.Json.JsonSerializer.Serialize(segments),
