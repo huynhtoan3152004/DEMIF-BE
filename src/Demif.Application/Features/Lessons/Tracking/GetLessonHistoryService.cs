@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Demif.Application.Abstractions.Persistence;
 using Demif.Application.Common.Models;
 using Demif.Domain.Enums;
@@ -53,6 +54,7 @@ public class GetLessonHistoryService
                         lesson.Category,
                         lesson.MediaType,
                         lesson.ThumbnailUrl,
+                        lesson.TimedTranscript,
                         lesson.DurationSeconds,
                         lesson.IsPremiumOnly,
                         TrackerStatus = tracker != null ? tracker.Status : (LessonProgressStatus?)null,
@@ -87,7 +89,7 @@ public class GetLessonHistoryService
             .Select(g => new
             {
                 LessonId = g.Key,
-                CompletedSegments = g.Count(),
+                CompletedSegments = g.Select(e => e.SegmentIndex!.Value).Distinct().Count(),
                 AvgScore = (int)Math.Round(g.Average(e => (double)e.Score)),
                 BestScore = g.Max(e => e.Score),
                 LastActivityAt = g.Max(e => e.CompletedAt)
@@ -99,6 +101,23 @@ public class GetLessonHistoryService
         var result = items.Select(item =>
         {
             statsDict.TryGetValue(item.Id, out var stats);
+            var totalSegments = GetTotalSegments(item.TimedTranscript);
+            var completedSegments = stats?.CompletedSegments ?? 0;
+
+            if (item.TrackerStatus == LessonProgressStatus.Completed && totalSegments > 0)
+            {
+                completedSegments = totalSegments;
+            }
+
+            if (totalSegments > 0)
+            {
+                completedSegments = Math.Min(completedSegments, totalSegments);
+            }
+
+            var progressPercent = totalSegments > 0
+                ? Math.Round((double)completedSegments / totalSegments * 100, 1)
+                : item.TrackerStatus == LessonProgressStatus.Completed ? 100 : 0;
+
             return new LessonHistoryItemDto
             {
                 LessonId = item.Id,
@@ -112,7 +131,9 @@ public class GetLessonHistoryService
                 IsPremiumOnly = item.IsPremiumOnly,
                 Status = item.TrackerStatus?.ToString() ?? "InProgress",
                 LastSegmentIndex = item.TrackerLastSegment,
-                CompletedSegments = stats?.CompletedSegments ?? 0,
+                TotalSegments = totalSegments,
+                CompletedSegments = completedSegments,
+                ProgressPercent = progressPercent,
                 AvgScore = stats?.AvgScore ?? 0,
                 BestScore = stats?.BestScore ?? 0,
                 StartedAt = item.TrackerStartedAt,
@@ -130,6 +151,26 @@ public class GetLessonHistoryService
             TotalPages = (int)Math.Ceiling((double)totalCount / pageSize)
         });
     }
+
+    private static int GetTotalSegments(string? timedTranscript)
+    {
+        if (string.IsNullOrWhiteSpace(timedTranscript))
+            return 0;
+
+        try
+        {
+            var segments = JsonSerializer.Deserialize<List<TimedSegment>>(timedTranscript, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            return segments?.Count ?? 0;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
 }
 
 public class LessonHistoryItemDto
@@ -145,7 +186,9 @@ public class LessonHistoryItemDto
     public bool IsPremiumOnly { get; set; }
     public string Status { get; set; } = "InProgress";
     public int LastSegmentIndex { get; set; }
+    public int TotalSegments { get; set; }
     public int CompletedSegments { get; set; }
+    public double ProgressPercent { get; set; }
     public int AvgScore { get; set; }
     public int BestScore { get; set; }
     public DateTime? StartedAt { get; set; }
