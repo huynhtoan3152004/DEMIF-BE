@@ -14,8 +14,10 @@ public class RecordLessonAccessService
         _dbContext = dbContext;
     }
 
-    public async Task RecordAsync(Guid userId, Guid lessonId, CancellationToken cancellationToken = default)
+    public async Task RecordAsync(Guid userId, Guid lessonId, string accessType = "detail", CancellationToken cancellationToken = default)
     {
+        var normalizedAccessType = string.IsNullOrWhiteSpace(accessType) ? "detail" : accessType.Trim();
+
         var tracker = await _dbContext.UserLessonTrackers
             .FirstOrDefaultAsync(x => x.UserId == userId && x.LessonId == lessonId, cancellationToken);
 
@@ -29,19 +31,25 @@ public class RecordLessonAccessService
                 LastSegmentIndex = 0,
                 StartedAt = DateTime.UtcNow
             });
-
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            return;
         }
 
-        if (tracker.Status == LessonProgressStatus.NotStarted)
+        if (tracker is not null && tracker.Status == LessonProgressStatus.NotStarted)
         {
             tracker.Status = LessonProgressStatus.Started;
             if (tracker.StartedAt == default)
             {
                 tracker.StartedAt = DateTime.UtcNow;
             }
-            await _dbContext.SaveChangesAsync(cancellationToken);
         }
+
+        _dbContext.LessonAccessEvents.Add(new LessonAccessEvent
+        {
+            UserId = userId,
+            LessonId = lessonId,
+            AccessType = normalizedAccessType,
+            AccessedAt = DateTime.UtcNow
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 }

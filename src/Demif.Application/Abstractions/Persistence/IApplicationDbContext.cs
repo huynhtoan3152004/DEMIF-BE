@@ -22,6 +22,7 @@ public interface IApplicationDbContext
     DbSet<Blog> Blogs { get; }
     DbSet<UserAnalytics> UserAnalytics { get; }
     DbSet<UserLessonTracker> UserLessonTrackers { get; }
+    DbSet<LessonAccessEvent> LessonAccessEvents { get; }
     DbSet<UserVocabulary> UserVocabularies { get; }
     DbSet<UserNotification> UserNotifications { get; }
 

@@ -211,7 +211,7 @@ Hiển thị hệ thống Thống kê chuyên sâu làm biểu đồ tại trang
 }
 ```
 - **Frontend rule:** Render theo từng nhóm `summary`, `users`, `lessons`, `exercises`, `vocabulary`, `subscriptions`, `payments`, `blogs`, `notifications`, `engagement`, `alerts`.
-- **Frontend rule:** `lessons.accessStats` là số lượt mở bài được ghi bằng tracker khi user đã đăng nhập mở lesson detail hoặc segments.
+- **Frontend rule:** `lessons.accessStats` là số lượt mở bài được ghi bằng bảng `LessonAccessEvents` khi user đã đăng nhập mở lesson detail hoặc segments.
 - **Frontend rule:** Không tự suy đoán doanh thu theo tên gói. Backend đã trả `revenueByTier` và `revenueByBillingCycle` từ dữ liệu thật của `SubscriptionPlan` + `Payment`.
 - **Frontend rule:** Dùng các field trạng thái trả từ server (`reviewStatus`, `byStatus`, `byType`, `byChannel`, `byTier`) để đổ chart và filter, tránh map lại bằng logic FE.
 - **Lỗi:**

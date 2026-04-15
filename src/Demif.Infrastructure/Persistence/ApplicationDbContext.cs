@@ -27,6 +27,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Blog> Blogs { get; set; }
     public DbSet<UserAnalytics> UserAnalytics { get; set; }
     public DbSet<UserLessonTracker> UserLessonTrackers => Set<UserLessonTracker>();
+    public DbSet<LessonAccessEvent> LessonAccessEvents => Set<LessonAccessEvent>();
     public DbSet<UserVocabulary> UserVocabularies => Set<UserVocabulary>();
     public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
 

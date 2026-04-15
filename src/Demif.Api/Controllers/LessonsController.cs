@@ -86,7 +86,7 @@ public class LessonsController : ControllerBase
 
         if (userId.HasValue)
         {
-            await _recordLessonAccessService.RecordAsync(userId.Value, id, cancellationToken);
+            await _recordLessonAccessService.RecordAsync(userId.Value, id, "detail", cancellationToken);
         }
 
         return Ok(result.Value);
@@ -123,7 +123,7 @@ public class LessonsController : ControllerBase
 
         if (userId.HasValue)
         {
-            await _recordLessonAccessService.RecordAsync(userId.Value, id, cancellationToken);
+            await _recordLessonAccessService.RecordAsync(userId.Value, id, "segments", cancellationToken);
         }
 
         return Ok(result.Value);

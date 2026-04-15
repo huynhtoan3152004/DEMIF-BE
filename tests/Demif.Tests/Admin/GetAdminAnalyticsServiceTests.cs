@@ -583,6 +583,31 @@ public class GetAdminAnalyticsServiceTests
         context.UserProgresses.AddRange(progress1, progress2);
         context.UserStreaks.AddRange(streak1, streak2);
         context.UserLessonTrackers.AddRange(tracker1, tracker2, tracker3);
+        context.LessonAccessEvents.AddRange(
+            new LessonAccessEvent
+            {
+                Id = Guid.NewGuid(),
+                UserId = activeUser.Id,
+                LessonId = lesson1.Id,
+                AccessType = "detail",
+                AccessedAt = monthStart.AddDays(2).AddHours(1)
+            },
+            new LessonAccessEvent
+            {
+                Id = Guid.NewGuid(),
+                UserId = pendingUser.Id,
+                LessonId = lesson1.Id,
+                AccessType = "segments",
+                AccessedAt = monthStart.AddDays(2).AddHours(2)
+            },
+            new LessonAccessEvent
+            {
+                Id = Guid.NewGuid(),
+                UserId = suspendedUser.Id,
+                LessonId = lesson2.Id,
+                AccessType = "detail",
+                AccessedAt = monthStart.AddDays(3).AddHours(1)
+            });
         context.UserAnalytics.AddRange(analytics1, analytics2);
 
         await context.SaveChangesAsync();

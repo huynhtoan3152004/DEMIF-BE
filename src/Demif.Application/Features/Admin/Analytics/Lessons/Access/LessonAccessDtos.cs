@@ -14,6 +14,7 @@ public class LessonAccessAnalyticsResponse
     public List<LessonAccessItem> TopAccessedLessons { get; set; } = new();
     public List<LessonAccessItem> RecentAccessedLessons { get; set; } = new();
     public List<StatCountItem> ByStatus { get; set; } = new();
+    public List<StatCountItem> ByAccessType { get; set; } = new();
 }
 
 public class LessonAccessItem

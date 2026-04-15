@@ -18,7 +18,7 @@ public class GetAdminLessonAccessAnalyticsServiceTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithLessonTrackers_ReturnsAccessStats()
+    public async Task ExecuteAsync_WithLessonAccessEvents_ReturnsAccessStats()
     {
         var context = CreateDbContext();
 
@@ -80,18 +80,53 @@ public class GetAdminLessonAccessAnalyticsServiceTests
                 StartedAt = DateTime.UtcNow.AddHours(-1)
             });
 
+        context.LessonAccessEvents.AddRange(
+            new LessonAccessEvent
+            {
+                Id = Guid.NewGuid(),
+                UserId = user1.Id,
+                LessonId = lesson1.Id,
+                AccessType = "detail",
+                AccessedAt = DateTime.UtcNow.AddHours(-4)
+            },
+            new LessonAccessEvent
+            {
+                Id = Guid.NewGuid(),
+                UserId = user2.Id,
+                LessonId = lesson1.Id,
+                AccessType = "segments",
+                AccessedAt = DateTime.UtcNow.AddHours(-3)
+            },
+            new LessonAccessEvent
+            {
+                Id = Guid.NewGuid(),
+                UserId = user1.Id,
+                LessonId = lesson1.Id,
+                AccessType = "segments",
+                AccessedAt = DateTime.UtcNow.AddHours(-2)
+            },
+            new LessonAccessEvent
+            {
+                Id = Guid.NewGuid(),
+                UserId = user3.Id,
+                LessonId = lesson2.Id,
+                AccessType = "detail",
+                AccessedAt = DateTime.UtcNow.AddHours(-1)
+            });
+
         await context.SaveChangesAsync();
 
         var service = new GetAdminLessonAccessAnalyticsService(context);
         var result = await service.ExecuteAsync();
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(3, result.Value.TotalAccessEvents);
+        Assert.Equal(4, result.Value.TotalAccessEvents);
         Assert.Equal(2, result.Value.TotalTrackedLessons);
         Assert.Equal(3, result.Value.TotalTrackedUsers);
-        Assert.Equal(2, result.Value.TopAccessedLessons.First().AccessCount);
+        Assert.Equal(3, result.Value.TopAccessedLessons.First().AccessCount);
         Assert.Equal(1, result.Value.ByStatus.Single(x => x.Key == LessonProgressStatus.Completed.ToString()).Count);
         Assert.Equal(1, result.Value.ByStatus.Single(x => x.Key == LessonProgressStatus.InProgress.ToString()).Count);
         Assert.Equal(1, result.Value.ByStatus.Single(x => x.Key == LessonProgressStatus.Started.ToString()).Count);
+        Assert.Equal(2, result.Value.ByAccessType.Single(x => x.Key == "segments").Count);
     }
 }

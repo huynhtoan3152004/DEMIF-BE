@@ -530,6 +530,7 @@ Authorization: Bearer <token>
 - `byType`, `byLevel`, `byCategory`, `byMediaType` should be rendered as donut/pie charts.
 - `accessStats.topAccessedLessons` should be rendered as a ranked list or bar chart.
 - `accessStats.byStatus` should be rendered as a small donut chart or stacked bar.
+- `accessStats.byAccessType` should be used when you need to split lesson opens between detail and segment views.
 
 ---
 
@@ -576,13 +577,17 @@ Authorization: Bearer <token>
     { "key": "Completed", "count": 1 },
     { "key": "InProgress", "count": 1 },
     { "key": "Started", "count": 1 }
+  ],
+  "byAccessType": [
+    { "key": "detail", "count": 2 },
+    { "key": "segments", "count": 1 }
   ]
 }
 ```
 
 ### Interpretation
 
-- `accessCount` is based on lesson tracker rows created when a logged-in user opens lesson detail or lesson segments.
+- `accessCount` is based on rows in `LessonAccessEvents` created when a logged-in user opens lesson detail or lesson segments.
 - `uniqueUsers` is the number of distinct users who accessed that lesson.
 - Use `accessCount` for popularity and `completionRate` for engagement quality.
 
