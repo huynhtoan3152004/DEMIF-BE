@@ -104,8 +104,27 @@ namespace Demif.Infrastructure.Migrations
                 table: "Blogs",
                 type: "character varying(200)",
                 maxLength: 200,
+                nullable: true);
+
+            migrationBuilder.Sql(@"
+UPDATE ""Blogs""
+SET ""Slug"" = LEFT(
+    lower(regexp_replace(coalesce(""Title"", 'blog'), '[^a-zA-Z0-9]+', '-', 'g')) || '-' || substr(""Id""::text, 1, 8),
+    200
+)
+WHERE ""Slug"" IS NULL OR btrim(""Slug"") = '';
+");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "Slug",
+                table: "Blogs",
+                type: "character varying(200)",
+                maxLength: 200,
                 nullable: false,
-                defaultValue: "");
+                oldClrType: typeof(string),
+                oldType: "character varying(200)",
+                oldMaxLength: 200,
+                oldNullable: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Blogs_Category",
