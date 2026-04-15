@@ -47,6 +47,12 @@ dotnet restore
 dotnet ef database update --project src/Demif.Infrastructure --startup-project src/Demif.Api
 ```
 
+Nếu muốn chạy nhanh bằng script Windows:
+
+```powershell
+.\dev.ps1 migrate
+```
+
 ### 5. Run application
 
 ```bash

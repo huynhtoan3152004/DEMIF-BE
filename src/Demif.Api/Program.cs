@@ -78,19 +78,18 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    var pendingMigrations = await dbContext.Database.GetPendingMigrationsAsync();
 
-    if (pendingMigrations.Any())
+    try
     {
-        Log.Information("EF Core pending migrations: {PendingMigrations}", string.Join(", ", pendingMigrations));
+        Log.Information("Applying EF Core migrations...");
+        await dbContext.Database.MigrateAsync();
+        Log.Information("EF Core migrations applied successfully.");
     }
-    else
+    catch (Exception ex)
     {
-        Log.Information("EF Core has no pending migrations.");
+        Log.Fatal(ex, "EF Core migration failed during startup.");
+        throw;
     }
-
-    await dbContext.Database.MigrateAsync();
-    Log.Information("EF Core migrations applied successfully.");
 }
 
 // Enable CORS

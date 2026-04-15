@@ -85,6 +85,18 @@ ASPNETCORE_ENVIRONMENT=Production
 1. Click **Deploy** button
 2. Theo dõi logs để đảm bảo build thành công
 
+> Nếu vừa có migration mới, chạy trước khi restart app:
+
+```bash
+dotnet ef database update --project src/Demif.Infrastructure --startup-project src/Demif.Api
+```
+
+Hoặc nếu bạn dùng script local Windows:
+
+```powershell
+.\dev.ps1 migrate
+```
+
 ---
 
 ## 🩺 Health Check

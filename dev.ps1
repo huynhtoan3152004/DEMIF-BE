@@ -1,10 +1,10 @@
-# Local build, test, and docker script for Windows
+# Local build, test, migrate, and docker script for Windows
 # Usage: .\dev.ps1 [command]
-# Commands: build, test, docker, all
+# Commands: build, test, migrate, docker, all
 
 param(
     [Parameter(Position=0)]
-    [ValidateSet("build", "test", "docker", "all")]
+    [ValidateSet("build", "test", "migrate", "docker", "all")]
     [string]$Command = "all"
 )
 
@@ -28,6 +28,17 @@ function Invoke-Test {
     else { throw "Tests failed" }
 }
 
+function Invoke-Migrate {
+    Write-Step "Restoring dotnet-ef tool..."
+    dotnet tool restore
+    if ($LASTEXITCODE -ne 0) { throw "dotnet tool restore failed" }
+
+    Write-Step "Applying EF Core migrations..."
+    dotnet ef database update --project src/Demif.Infrastructure --startup-project src/Demif.Api
+    if ($LASTEXITCODE -eq 0) { Write-Success "Database migrations applied" }
+    else { throw "Migration failed" }
+}
+
 function Invoke-Docker {
     Write-Step "Building Docker image..."
     docker build -t demif-be:latest .
@@ -45,6 +56,7 @@ function Invoke-All {
 switch ($Command) {
     "build" { Invoke-Build }
     "test" { Invoke-Test }
+    "migrate" { Invoke-Migrate }
     "docker" { Invoke-Docker }
     "all" { Invoke-All }
 }
