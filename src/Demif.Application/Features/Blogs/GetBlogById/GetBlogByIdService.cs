@@ -21,20 +21,31 @@ namespace Demif.Application.Features.Blogs.GetBlogById
 
         public async Task<BlogDto?> ExecuteAsync(Guid id)
         {
-            var blog = await _blogRepository.GetByIdAsync(id);
+            var blog = await _blogRepository.GetByIdWithAuthorAsync(id);
             if (blog == null) return null;
+
+            blog.ViewCount += 1;
+            blog.UpdatedAt = DateTime.UtcNow;
+            await _blogRepository.UpdateAsync(blog);
 
             return new BlogDto
             {
                 Id = blog.Id,
                 Title = blog.Title,
+                Slug = blog.Slug,
+                Category = blog.Category,
                 Content = blog.Content,
                 Summary = blog.Summary,
                 ThumbnailUrl = blog.ThumbnailUrl,
                 Tags = blog.Tags,
                 Status = blog.Status,
+                PublishedAt = blog.PublishedAt,
+                ReadingTimeMinutes = blog.ReadingTimeMinutes,
+                IsFeatured = blog.IsFeatured,
                 ViewCount = blog.ViewCount,
                 AuthorId = blog.AuthorId,
+                AuthorName = blog.Author?.Username,
+                AuthorAvatarUrl = blog.Author?.AvatarUrl,
                 CreatedAt = blog.CreatedAt,
                 UpdatedAt = blog.UpdatedAt
             };

@@ -11,9 +11,12 @@ namespace Demif.Application.Features.Blogs.UpdateBlog
         [Required(ErrorMessage = "Nội dung không được để trống")]
         public string Content { get; set; } = string.Empty;
 
+        public string? Slug { get; set; }
+        public string? Category { get; set; }
         public string? Summary { get; set; }
         public IFormFile? ThumbnailFile { get; set; }
         public string? Tags { get; set; }
+        public bool IsFeatured { get; set; }
         public string Status { get; set; } = "published";
     }
 }

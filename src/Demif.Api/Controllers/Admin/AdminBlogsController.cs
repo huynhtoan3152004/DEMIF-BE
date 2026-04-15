@@ -1,5 +1,6 @@
 using Demif.Application.Features.Blogs.CreateBlog;
 using Demif.Application.Features.Blogs.DeleteBlog;
+using Demif.Application.Features.Blogs.GetBlogs;
 using Demif.Application.Features.Blogs.UpdateBlog;
 using Demif.Api.Contracts;
 using Microsoft.AspNetCore.Authorization;
@@ -18,17 +19,30 @@ namespace Demif.Api.Controllers.Admin;
 public class AdminBlogsController : ControllerBase
 {
     private readonly ICreateBlogService _createBlogService;
+    private readonly IGetBlogsService _getBlogsService;
     private readonly IUpdateBlogService _updateBlogService;
     private readonly IDeleteBlogService _deleteBlogService;
 
     public AdminBlogsController(
         ICreateBlogService createBlogService,
+        IGetBlogsService getBlogsService,
         IUpdateBlogService updateBlogService,
         IDeleteBlogService deleteBlogService)
     {
         _createBlogService = createBlogService;
+        _getBlogsService = getBlogsService;
         _updateBlogService = updateBlogService;
         _deleteBlogService = deleteBlogService;
+    }
+
+    /// <summary>List blog posts for CMS management.</summary>
+    [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetBlogs([FromQuery] GetBlogsRequest request)
+    {
+        request.IncludeDeleted = true;
+        var result = await _getBlogsService.ExecuteAsync(request, includeDeleted: true);
+        return Ok(result);
     }
 
     /// <summary>Create a new blog post.</summary>

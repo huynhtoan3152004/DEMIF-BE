@@ -10,6 +10,10 @@ public class Blog : AuditableEntity
 {
     public string Title { get; set; } = string.Empty;
 
+    public string Slug { get; set; } = string.Empty;
+
+    public string? Category { get; set; }
+
     public string Content { get; set; } = string.Empty;
 
     /// Mô tả ngắn hiển thị ở danh sách bài viết
@@ -19,6 +23,16 @@ public class Blog : AuditableEntity
     public string? ThumbnailUrl { get; set; }
 
     public string Status { get; set; } = "published";
+
+    public DateTime? PublishedAt { get; set; }
+
+    public int ReadingTimeMinutes { get; set; }
+
+    public bool IsFeatured { get; set; }
+
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedAt { get; set; }
 
     /// JSON array tags: ["tips", "grammar", "ielts"]
    

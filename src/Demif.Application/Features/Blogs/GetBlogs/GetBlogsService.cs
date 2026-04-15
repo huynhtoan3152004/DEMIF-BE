@@ -7,7 +7,7 @@ namespace Demif.Application.Features.Blogs.GetBlogs
 {
     public interface IGetBlogsService
     {
-        Task<IEnumerable<BlogDto>> ExecuteAsync();
+        Task<PagedBlogResponse> ExecuteAsync(GetBlogsRequest request, bool includeDeleted = false);
     }
 
     public class GetBlogsService : IGetBlogsService
@@ -19,24 +19,57 @@ namespace Demif.Application.Features.Blogs.GetBlogs
             _blogRepository = blogRepository;
         }
 
-        public async Task<IEnumerable<BlogDto>> ExecuteAsync()
+        public async Task<PagedBlogResponse> ExecuteAsync(GetBlogsRequest request, bool includeDeleted = false)
         {
-            var blogs = await _blogRepository.GetAllAsync();
+            var page = Math.Max(1, request.Page);
+            var pageSize = Math.Clamp(request.PageSize, 1, 50);
+            var status = includeDeleted ? request.Status : "published";
 
-            return blogs.Select(b => new BlogDto
+            var (items, totalCount) = await _blogRepository.GetPagedAsync(
+                request.Search,
+                request.Category,
+                request.Tag,
+                status,
+                includeDeleted || request.IncludeDeleted,
+                request.SortBy,
+                request.SortDirection,
+                page,
+                pageSize);
+
+            var mappedItems = items.Select(MapToDto).ToList();
+            return new PagedBlogResponse
             {
-                Id = b.Id,
-                Title = b.Title,
-                Content = b.Content,
-                Summary = b.Summary,
-                ThumbnailUrl = b.ThumbnailUrl,
-                Tags = b.Tags,
-                Status = b.Status,
-                ViewCount = b.ViewCount,
-                AuthorId = b.AuthorId,
-                CreatedAt = b.CreatedAt,
-                UpdatedAt = b.UpdatedAt
-            }).OrderByDescending(b => b.CreatedAt).ToList();
+                Items = mappedItems,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            };
+        }
+
+        private static BlogDto MapToDto(Domain.Entities.Blog blog)
+        {
+            return new BlogDto
+            {
+                Id = blog.Id,
+                Title = blog.Title,
+                Slug = blog.Slug,
+                Category = blog.Category,
+                Content = blog.Content,
+                Summary = blog.Summary,
+                ThumbnailUrl = blog.ThumbnailUrl,
+                Tags = blog.Tags,
+                Status = blog.Status,
+                PublishedAt = blog.PublishedAt,
+                ReadingTimeMinutes = blog.ReadingTimeMinutes,
+                IsFeatured = blog.IsFeatured,
+                ViewCount = blog.ViewCount,
+                AuthorId = blog.AuthorId,
+                AuthorName = blog.Author?.Username,
+                AuthorAvatarUrl = blog.Author?.AvatarUrl,
+                CreatedAt = blog.CreatedAt,
+                UpdatedAt = blog.UpdatedAt
+            };
         }
     }
 }

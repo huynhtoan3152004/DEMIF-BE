@@ -35,6 +35,7 @@ using Demif.Application.Features.Users.UpdateUserStatus;
 using Demif.Application.Features.Blogs.CreateBlog;
 using Demif.Application.Features.Blogs.GetBlogs;
 using Demif.Application.Features.Blogs.GetBlogById;
+using Demif.Application.Features.Blogs.GetBlogBySlug;
 using Demif.Application.Features.Blogs.UpdateBlog;
 using Demif.Application.Features.Blogs.DeleteBlog;
 using Demif.Application.Features.Me.GetProgress;
@@ -130,6 +131,7 @@ public static class DependencyInjection
         services.AddScoped<ICreateBlogService, CreateBlogService>();
         services.AddScoped<IGetBlogsService, GetBlogsService>();
         services.AddScoped<IGetBlogByIdService, GetBlogByIdService>();
+        services.AddScoped<IGetBlogBySlugService, GetBlogBySlugService>();
         services.AddScoped<IUpdateBlogService, UpdateBlogService>();
         services.AddScoped<IDeleteBlogService, DeleteBlogService>();
 
