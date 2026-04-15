@@ -86,7 +86,7 @@ public class VocabularyService
                 CorrectReviews = 0,
                 ConsecutiveCorrect = 0,
                 IsMastered = false,
-                NextReviewAt = null
+                NextReviewAt = now.AddDays(GetNextReviewIntervalDays(0))
             };
 
             _dbContext.UserVocabularies.Add(item);
@@ -139,7 +139,7 @@ public class VocabularyService
         }
 
         if (dueOnly)
-            query = query.Where(x => x.NextReviewAt == null || x.NextReviewAt <= now);
+            query = query.Where(x => !x.IsMastered && (x.NextReviewAt == null || x.NextReviewAt <= now));
 
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -161,6 +161,63 @@ public class VocabularyService
         });
     }
 
+    public async Task<Result<VocabularyReviewQueueResponse>> GetReviewQueueAsync(
+        Guid userId,
+        VocabularyQueryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var page = Math.Max(1, request.Page);
+        var pageSize = Math.Clamp(request.PageSize, 1, 100);
+        var now = DateTime.UtcNow;
+
+        var query = _dbContext.UserVocabularies
+            .AsNoTracking()
+            .Include(x => x.Lesson)
+            .Where(x => x.UserId == userId && !x.IsMastered)
+            .Where(x => x.NextReviewAt == null || x.NextReviewAt <= now);
+
+        if (request.LessonId.HasValue)
+            query = query.Where(x => x.LessonId == request.LessonId.Value);
+
+        if (!string.IsNullOrWhiteSpace(request.Topic))
+        {
+            var topic = request.Topic.Trim();
+            query = query.Where(x => x.Topic == topic);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim();
+            query = query.Where(x => x.Word.Contains(search) || (x.Meaning != null && x.Meaning.Contains(search)) || x.Topic.Contains(search));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var overdueCount = await query.CountAsync(x => x.NextReviewAt.HasValue && x.NextReviewAt < now, cancellationToken);
+        var newCount = await query.CountAsync(x => x.ReviewCount == 0 && !x.IsMastered, cancellationToken);
+        var learningCount = Math.Max(0, totalCount - newCount);
+
+        var items = await query
+            .OrderBy(x => x.NextReviewAt ?? now)
+            .ThenBy(x => x.ReviewCount)
+            .ThenBy(x => x.Word)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return Result.Success(new VocabularyReviewQueueResponse
+        {
+            Items = items.Select(item => Map(item, now: now)).ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize,
+            DueCount = totalCount,
+            OverdueCount = overdueCount,
+            NewCount = newCount,
+            LearningCount = learningCount,
+            MasteredCount = 0
+        });
+    }
+
     public async Task<Result<VocabularyOverviewResponse>> GetOverviewAsync(
         Guid userId,
         CancellationToken cancellationToken = default)
@@ -174,9 +231,11 @@ public class VocabularyService
             .Where(x => x.UserId == userId);
 
         var totalCount = await baseQuery.CountAsync(cancellationToken);
-        var dueCount = await baseQuery.CountAsync(x => x.NextReviewAt == null || x.NextReviewAt <= now, cancellationToken);
+        var dueCount = await baseQuery.CountAsync(x => !x.IsMastered && (x.NextReviewAt == null || x.NextReviewAt <= now), cancellationToken);
+        var overdueCount = await baseQuery.CountAsync(x => !x.IsMastered && x.NextReviewAt.HasValue && x.NextReviewAt < now, cancellationToken);
+        var newCount = await baseQuery.CountAsync(x => x.ReviewCount == 0 && !x.IsMastered, cancellationToken);
         var masteredCount = await baseQuery.CountAsync(x => x.IsMastered, cancellationToken);
-        var learningCount = Math.Max(0, totalCount - masteredCount);
+        var learningCount = Math.Max(0, totalCount - masteredCount - newCount);
         var topicCount = await baseQuery.Select(x => x.Topic).Distinct().CountAsync(cancellationToken);
         var lessonCount = await baseQuery.Select(x => x.LessonId).Distinct().CountAsync(cancellationToken);
         var recentCount = await baseQuery.CountAsync(x => x.CreatedAt >= weekAgo, cancellationToken);
@@ -191,13 +250,15 @@ public class VocabularyService
         {
             TotalCount = totalCount,
             DueCount = dueCount,
+            OverdueCount = overdueCount,
+            NewCount = newCount,
             MasteredCount = masteredCount,
             LearningCount = learningCount,
             TopicCount = topicCount,
             LessonCount = lessonCount,
             RecentCount = recentCount,
             MasteryRate = totalCount > 0 ? Math.Round((decimal)masteredCount / totalCount * 100, 1) : 0,
-            RecentItems = recentItems.Select(item => Map(item)).ToList()
+            RecentItems = recentItems.Select(item => Map(item, now: now)).ToList()
         });
     }
 
@@ -320,13 +381,13 @@ public class VocabularyService
             item.NextReviewAt = now.AddDays(GetNextReviewIntervalDays(item.ConsecutiveCorrect));
         }
 
-        item.IsMastered = request.IsCorrect && item.CorrectReviews >= 3;
+        item.IsMastered = request.IsCorrect && !isEarlyReview && item.ConsecutiveCorrect >= 3;
         item.MasteredAt = item.IsMastered && item.MasteredAt is null ? now : item.MasteredAt;
         item.UpdatedAt = now;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(Map(item));
+        return Result.Success(Map(item, now: now, lastReviewWasEarly: isEarlyReview));
     }
 
     public async Task<Result> DeleteAsync(Guid userId, Guid vocabularyId, CancellationToken cancellationToken = default)
@@ -393,9 +454,21 @@ public class VocabularyService
         return string.IsNullOrWhiteSpace(input) ? null : input.Trim();
     }
 
-    private static VocabularyItemResponse Map(UserVocabulary item, Lesson? lesson = null)
+    private static VocabularyItemResponse Map(UserVocabulary item, Lesson? lesson = null, DateTime? now = null, bool? lastReviewWasEarly = null)
     {
         lesson ??= item.Lesson;
+        var evaluationTime = now ?? DateTime.UtcNow;
+        var isDue = !item.IsMastered && (item.NextReviewAt == null || item.NextReviewAt <= evaluationTime);
+        var isOverdue = !item.IsMastered && item.NextReviewAt.HasValue && item.NextReviewAt.Value < evaluationTime;
+        var reviewStatus = item.IsMastered
+            ? "mastered"
+            : item.ReviewCount == 0
+                ? "new"
+                : isOverdue
+                    ? "overdue"
+                    : isDue
+                        ? "due"
+                        : "learning";
 
         return new VocabularyItemResponse
         {
@@ -412,6 +485,13 @@ public class VocabularyService
             ReviewCount = item.ReviewCount,
             CorrectReviews = item.CorrectReviews,
             IsMastered = item.IsMastered,
+            IsDue = isDue,
+            IsOverdue = isOverdue,
+            ReviewStatus = reviewStatus,
+            DaysUntilNextReview = item.NextReviewAt.HasValue
+                ? (int)Math.Ceiling((item.NextReviewAt.Value - evaluationTime).TotalDays)
+                : null,
+            LastReviewWasEarly = lastReviewWasEarly,
             LastReviewedAt = item.LastReviewedAt,
             NextReviewAt = item.NextReviewAt,
             MasteredAt = item.MasteredAt,
@@ -460,6 +540,11 @@ public class VocabularyItemResponse
     public int ReviewCount { get; set; }
     public int CorrectReviews { get; set; }
     public bool IsMastered { get; set; }
+    public bool IsDue { get; set; }
+    public bool IsOverdue { get; set; }
+    public string ReviewStatus { get; set; } = string.Empty;
+    public int? DaysUntilNextReview { get; set; }
+    public bool? LastReviewWasEarly { get; set; }
     public DateTime? LastReviewedAt { get; set; }
     public DateTime? NextReviewAt { get; set; }
     public DateTime? MasteredAt { get; set; }
@@ -475,10 +560,25 @@ public class VocabularyListResponse
     public int PageSize { get; set; }
 }
 
+public class VocabularyReviewQueueResponse
+{
+    public List<VocabularyItemResponse> Items { get; set; } = new();
+    public int TotalCount { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+    public int DueCount { get; set; }
+    public int OverdueCount { get; set; }
+    public int NewCount { get; set; }
+    public int LearningCount { get; set; }
+    public int MasteredCount { get; set; }
+}
+
 public class VocabularyOverviewResponse
 {
     public int TotalCount { get; set; }
     public int DueCount { get; set; }
+    public int OverdueCount { get; set; }
+    public int NewCount { get; set; }
     public int MasteredCount { get; set; }
     public int LearningCount { get; set; }
     public int TopicCount { get; set; }

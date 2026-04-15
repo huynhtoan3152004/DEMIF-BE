@@ -53,11 +53,13 @@ public class VocabularyServiceTests
         Assert.Equal("travel", result.Value.Topic);
         Assert.Equal("Journey", result.Value.Word);
         Assert.Single(context.UserVocabularies);
-        Assert.Null(result.Value.NextReviewAt);
+        Assert.Equal("new", result.Value.ReviewStatus);
+        Assert.True(result.Value.NextReviewAt.HasValue);
+        Assert.True(result.Value.NextReviewAt > DateTime.UtcNow);
     }
 
     [Fact]
-    public async Task SaveAsync_NewItemAppearsInDueListImmediately()
+    public async Task SaveAsync_NewItemIsScheduledForTomorrow_AndNotDueImmediately()
     {
         var context = CreateDbContext();
         var lesson = CreatePublishedLesson(Guid.NewGuid(), "travel");
@@ -79,8 +81,9 @@ public class VocabularyServiceTests
         var dueResult = await service.GetAsync(_userId, new VocabularyQueryRequest(), dueOnly: true);
 
         Assert.True(dueResult.IsSuccess);
-        Assert.Single(dueResult.Value.Items);
-        Assert.Equal("Journey", dueResult.Value.Items[0].Word);
+        Assert.Empty(dueResult.Value.Items);
+        Assert.Equal("new", saveResult.Value.ReviewStatus);
+        Assert.True(saveResult.Value.NextReviewAt > DateTime.UtcNow);
     }
 
     [Fact]
@@ -175,7 +178,11 @@ public class VocabularyServiceTests
         var service = new VocabularyService(context);
 
         await service.ReviewAsync(_userId, vocabulary.Id, new ReviewVocabularyRequest { IsCorrect = true });
+        vocabulary.NextReviewAt = DateTime.UtcNow.AddDays(-1);
+        await context.SaveChangesAsync();
         await service.ReviewAsync(_userId, vocabulary.Id, new ReviewVocabularyRequest { IsCorrect = true });
+        vocabulary.NextReviewAt = DateTime.UtcNow.AddDays(-1);
+        await context.SaveChangesAsync();
         var result = await service.ReviewAsync(_userId, vocabulary.Id, new ReviewVocabularyRequest { IsCorrect = true });
 
         Assert.True(result.IsSuccess);
@@ -184,6 +191,7 @@ public class VocabularyServiceTests
         Assert.True(result.Value.IsMastered);
         Assert.NotNull(result.Value.MasteredAt);
         Assert.True(result.Value.NextReviewAt > DateTime.UtcNow);
+        Assert.Equal("mastered", result.Value.ReviewStatus);
     }
 
     [Fact]
@@ -202,6 +210,8 @@ public class VocabularyServiceTests
                 Word = "airport",
                 NormalizedWord = "airport",
                 IsMastered = true,
+                ReviewCount = 1,
+                CorrectReviews = 1,
                 NextReviewAt = DateTime.UtcNow.AddDays(-1)
             },
             new UserVocabulary
@@ -221,9 +231,11 @@ public class VocabularyServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(2, result.Value.TotalCount);
-        Assert.Equal(2, result.Value.DueCount);
+        Assert.Equal(1, result.Value.DueCount);
+        Assert.Equal(1, result.Value.OverdueCount);
+        Assert.Equal(1, result.Value.NewCount);
         Assert.Equal(1, result.Value.MasteredCount);
-        Assert.Equal(1, result.Value.LearningCount);
+        Assert.Equal(0, result.Value.LearningCount);
         Assert.Equal(2, result.Value.RecentItems.Count);
         Assert.Equal(1, result.Value.TopicCount);
         Assert.Equal(1, result.Value.LessonCount);
@@ -287,6 +299,8 @@ public class VocabularyServiceTests
         Assert.True(result.Value.NextReviewAt.HasValue);
         var diff = expectedNextReview - result.Value.NextReviewAt.Value;
         Assert.True(Math.Abs(diff.TotalMinutes) < 1);
+        Assert.False(result.Value.IsMastered);
+        Assert.True(result.Value.LastReviewWasEarly == false);
     }
 
     [Fact]
@@ -321,5 +335,50 @@ public class VocabularyServiceTests
         var diff = originalNextReview - result.Value.NextReviewAt.Value;
         // The difference should be 0 since it wasn't updated.
         Assert.True(Math.Abs(diff.TotalMinutes) < 1);
+        Assert.True(result.Value.LastReviewWasEarly == true);
+        Assert.Equal("learning", result.Value.ReviewStatus);
+    }
+
+    [Fact]
+    public async Task GetReviewQueueAsync_ReturnsDueItemsWithQueueState()
+    {
+        var context = CreateDbContext();
+        var lesson = CreatePublishedLesson(Guid.NewGuid(), "travel");
+        context.Lessons.Add(lesson);
+
+        context.UserVocabularies.AddRange(
+            new UserVocabulary
+            {
+                UserId = _userId,
+                LessonId = lesson.Id,
+                Topic = "travel",
+                Word = "airport",
+                NormalizedWord = "airport",
+                NextReviewAt = DateTime.UtcNow.AddHours(-2),
+                ReviewCount = 1
+            },
+            new UserVocabulary
+            {
+                UserId = _userId,
+                LessonId = lesson.Id,
+                Topic = "travel",
+                Word = "hotel",
+                NormalizedWord = "hotel",
+                NextReviewAt = DateTime.UtcNow.AddHours(10),
+                ReviewCount = 0
+            });
+
+        await context.SaveChangesAsync();
+
+        var service = new VocabularyService(context);
+        var result = await service.GetReviewQueueAsync(_userId, new VocabularyQueryRequest());
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value.Items);
+        Assert.Equal("airport", result.Value.Items[0].Word);
+        Assert.True(result.Value.Items[0].IsDue);
+        Assert.Equal("overdue", result.Value.Items[0].ReviewStatus);
+        Assert.Equal(1, result.Value.OverdueCount);
+        Assert.Equal(0, result.Value.NewCount);
     }
 }

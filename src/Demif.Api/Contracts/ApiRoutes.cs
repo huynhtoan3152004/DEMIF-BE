@@ -90,6 +90,7 @@ public static class ApiRoutes
         public const string GetStreak = $"{Base}/me/streak";
         public const string RecordActivity = $"{Base}/me/activity";
         public const string Vocabulary = $"{Base}/me/vocabulary";
+        public const string VocabularyReview = $"{Base}/me/vocabulary/review";
         public const string VocabularyOverview = $"{Base}/me/vocabulary/overview";
         public const string VocabularySuggestions = $"{Base}/me/vocabulary/suggestions";
         public static class Notifications

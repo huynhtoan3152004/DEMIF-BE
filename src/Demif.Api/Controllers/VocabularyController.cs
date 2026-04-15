@@ -76,6 +76,19 @@ public class VocabularyController : ControllerBase
         return Ok(result.Value);
     }
 
+    [HttpGet("review")]
+    public async Task<IActionResult> GetReviewQueue([FromQuery] VocabularyQueryRequest request, CancellationToken cancellationToken)
+    {
+        if (_currentUserService.UserId is not { } userId)
+            return Unauthorized();
+
+        var result = await _vocabularyService.GetReviewQueueAsync(userId, request, cancellationToken);
+        if (result.IsFailure)
+            return BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+
+        return Ok(result.Value);
+    }
+
     [HttpPost]
     public async Task<IActionResult> SaveVocabulary([FromBody] SaveVocabularyRequest request, CancellationToken cancellationToken)
     {

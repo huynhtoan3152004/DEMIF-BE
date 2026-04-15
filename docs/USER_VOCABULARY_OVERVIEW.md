@@ -45,6 +45,7 @@ Các endpoint hiện có:
 
 - `GET /api/me/vocabulary`: lấy danh sách từ vựng của user.
 - `GET /api/me/vocabulary/overview`: lấy dashboard tổng quan của bộ từ vựng.
+- `GET /api/me/vocabulary/review`: lấy queue ôn tập theo trạng thái review.
 - `GET /api/me/vocabulary/due`: lấy các từ đến hạn ôn.
 - `GET /api/me/vocabulary/suggestions?lessonId=...`: lấy gợi ý từ vựng từ transcript của một lesson.
 - `POST /api/me/vocabulary`: lưu hoặc cập nhật một từ vựng.
@@ -58,7 +59,7 @@ Khi user lưu từ mới:
 - Nếu không truyền `Topic`, hệ thống sẽ lấy từ `Lesson.Category`, nếu không có thì fallback về `Lesson.Title`.
 - Từ được normalize trước khi so trùng.
 - Nếu đã có bản ghi cùng `UserId + LessonId + Topic + NormalizedWord`, service sẽ update thay vì tạo mới.
-- Mỗi bản ghi mới sẽ có `NextReviewAt = UtcNow + 1 ngày`.
+- Mỗi bản ghi mới sẽ có `NextReviewAt = UtcNow + 1 ngày`, nên không xuất hiện ngay trong queue ôn tập.
 
 ## Logic Ôn Tập
 
@@ -68,7 +69,26 @@ Mỗi lần review:
 - Nếu đúng thì tăng `CorrectReviews`.
 - Cập nhật `LastReviewedAt`.
 - Tính `NextReviewAt` theo lịch đơn giản: 1, 3, 7, 14, 30 ngày.
-- Đánh dấu `IsMastered` khi user trả lời đúng đủ số lần cần thiết.
+- Chỉ đánh dấu `IsMastered` khi user trả lời đúng ở phiên review đúng hạn.
+- Review sớm đúng sẽ giữ nguyên lịch hiện tại, nhưng không đẩy word vào trạng thái mastered.
+
+## Trạng thái FE nên dùng
+
+Response của `GET /api/me/vocabulary` và `POST /api/me/vocabulary/{id}/review` có thêm các field:
+
+- `reviewStatus`: `new`, `learning`, `due`, `overdue`, `mastered`.
+- `isDue`: dùng để hiển thị badge cần ôn.
+- `isOverdue`: dùng để ưu tiên item trễ hạn.
+- `daysUntilNextReview`: số ngày còn lại đến lịch ôn tiếp theo, có thể âm nếu quá hạn.
+- `lastReviewWasEarly`: chỉ có ý nghĩa sau khi gọi review, để FE hiển thị thông báo “review sớm nên lịch không đổi”.
+
+## FE Validate Gợi Ý
+
+- Dùng `GET /api/me/vocabulary/review` cho màn flashcard ôn tập.
+- Dùng `reviewStatus` để gắn badge thay vì tự suy đoán từ `nextReviewAt`.
+- Khi `reviewStatus = new`, hiển thị là từ mới đã lưu, chưa cần đưa vào queue ngay.
+- Khi `reviewStatus = overdue`, ưu tiên đưa lên đầu danh sách.
+- Sau `POST /api/me/vocabulary/{id}/review`, nếu `lastReviewWasEarly = true` thì không nên thông báo đã tiến lịch.
 
 ## Database
 
@@ -128,8 +148,10 @@ Response:
 {
 	"totalCount": 24,
 	"dueCount": 5,
+	"overdueCount": 2,
+	"newCount": 6,
 	"masteredCount": 9,
-	"learningCount": 15,
+	"learningCount": 9,
 	"topicCount": 4,
 	"lessonCount": 7,
 	"recentCount": 3,
@@ -225,6 +247,10 @@ Response:
 	"note": "Từ này hay xuất hiện trong bài nghe",
 	"reviewCount": 0,
 	"correctReviews": 0,
+	"isDue": false,
+	"isOverdue": false,
+	"reviewStatus": "new",
+	"daysUntilNextReview": 1,
 	"isMastered": false,
 	"lastReviewedAt": null,
 	"nextReviewAt": "2026-04-13T08:00:00Z",
@@ -256,6 +282,10 @@ Response:
 			"note": "Từ này hay xuất hiện trong bài nghe",
 			"reviewCount": 1,
 			"correctReviews": 1,
+			"isDue": true,
+			"isOverdue": true,
+			"reviewStatus": "overdue",
+			"daysUntilNextReview": -1,
 			"isMastered": false,
 			"lastReviewedAt": "2026-04-12T08:15:00Z",
 			"nextReviewAt": "2026-04-13T08:15:00Z",
@@ -275,6 +305,26 @@ Response:
 `GET /api/me/vocabulary/due?page=1&pageSize=20`
 
 Response shape giống `GET /api/me/vocabulary`, nhưng chỉ trả các từ đến hạn ôn.
+
+### Get Review Queue
+
+`GET /api/me/vocabulary/review?page=1&pageSize=20`
+
+Response shape giống `GET /api/me/vocabulary`, nhưng chỉ trả các từ cần ôn ngay và có thêm thống kê queue:
+
+```json
+{
+	"items": [],
+	"totalCount": 0,
+	"page": 1,
+	"pageSize": 20,
+	"dueCount": 0,
+	"overdueCount": 0,
+	"newCount": 0,
+	"learningCount": 0,
+	"masteredCount": 0
+}
+```
 
 ### Review Vocabulary
 
@@ -304,9 +354,14 @@ Response:
 	"note": "Từ này hay xuất hiện trong bài nghe",
 	"reviewCount": 2,
 	"correctReviews": 2,
+	"isDue": false,
+	"isOverdue": false,
+	"reviewStatus": "learning",
+	"daysUntilNextReview": 3,
 	"isMastered": false,
 	"lastReviewedAt": "2026-04-12T08:20:00Z",
 	"nextReviewAt": "2026-04-15T08:20:00Z",
+	"lastReviewWasEarly": false,
 	"masteredAt": null,
 	"createdAt": "2026-04-12T08:00:00Z",
 	"updatedAt": "2026-04-12T08:20:00Z"
@@ -335,9 +390,14 @@ Response: `204 No Content`
 | `note` | string | Ghi chú của user |
 | `reviewCount` | number | Số lần ôn |
 | `correctReviews` | number | Số lần ôn đúng |
+| `isDue` | boolean | Có nằm trong queue ôn ngay không |
+| `isOverdue` | boolean | Có bị quá hạn hay không |
+| `reviewStatus` | string | Trạng thái FE nên dùng (`new`, `learning`, `due`, `overdue`, `mastered`) |
+| `daysUntilNextReview` | number or null | Số ngày còn lại đến lịch ôn tiếp theo |
 | `isMastered` | boolean | Đã thuộc hay chưa |
 | `lastReviewedAt` | string or null | Thời điểm ôn gần nhất |
 | `nextReviewAt` | string or null | Thời điểm nên ôn tiếp |
+| `lastReviewWasEarly` | boolean or null | Có phải review sớm hay không, chỉ có ý nghĩa sau khi gọi review |
 | `masteredAt` | string or null | Thời điểm đạt mastered |
 | `createdAt` | string | Thời điểm tạo |
 | `updatedAt` | string or null | Thời điểm cập nhật |
