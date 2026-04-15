@@ -46,10 +46,10 @@ public class GetLessonByIdService
             return new GetLessonByIdResponse
             {
                 Id = lesson.Id,
-                Title = lesson.Title,
+                Title = lesson.Title ?? string.Empty,
                 Description = lesson.Description,
-                LessonType = lesson.LessonType,
-                Level = lesson.Level,
+                LessonType = lesson.LessonType ?? "Dictation",
+                Level = lesson.Level ?? "Beginner",
                 Category = lesson.Category,
                 MediaUrl = mediaUrl,
                 AudioUrl = lesson.AudioUrl,

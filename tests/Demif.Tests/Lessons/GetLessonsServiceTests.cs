@@ -110,4 +110,40 @@ public class GetLessonsServiceTests
             null,
             It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_DefaultsNullLessonStrings_WithoutThrowing()
+    {
+        var lesson = new Lesson
+        {
+            Id = Guid.NewGuid(),
+            Title = null!,
+            LessonType = null!,
+            Level = null!,
+            AudioUrl = null!,
+            Status = "published"
+        };
+
+        _lessonRepoMock
+            .Setup(r => r.GetForUserAsync(
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<bool>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(((IEnumerable<Lesson> Items, int TotalCount))(new[] { lesson }, 1));
+
+        var result = await _service.ExecuteAsync(new GetLessonsRequest(), userId: null);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value.Items);
+        Assert.Equal(string.Empty, result.Value.Items[0].Title);
+        Assert.Equal("Dictation", result.Value.Items[0].LessonType);
+        Assert.Equal("Beginner", result.Value.Items[0].Level);
+    }
 }

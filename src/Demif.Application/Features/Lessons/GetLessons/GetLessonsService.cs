@@ -71,10 +71,10 @@ public class GetLessonsService
         return new LessonDto
         {
             Id = lesson.Id,
-            Title = lesson.Title,
+            Title = lesson.Title ?? string.Empty,
             Description = lesson.Description,
-            LessonType = lesson.LessonType.ToString(),
-            Level = lesson.Level.ToString(),
+            LessonType = lesson.LessonType ?? "Dictation",
+            Level = lesson.Level ?? "Beginner",
             Category = lesson.Category,
             MediaUrl = mediaUrl,
             AudioUrl = lesson.AudioUrl,
