@@ -9,10 +9,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace Demif.Api.Controllers.Admin;
 
 /// <summary>
-/// Admin CRUD operations for blog posts.
+/// Moderator/Admin CRUD operations for blog posts.
 /// </summary>
 [ApiController]
-[Authorize(Policy = "RequireAdmin")]
+[Authorize(Policy = "RequireModerator")]
 [Route(ApiRoutes.Base + "/admin/blogs")]
 [Produces("application/json")]
 [Tags("Admin - Blogs")]
